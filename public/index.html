@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>컬러 타일 멀티</title>
+<title>컬러 타일 멀티 v3</title>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--tx:#1c1e21;--mu:#6b7280;--bd:#d9dce1;--ac:#3b6cf6;--empty:#e6e8ec;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14161a;--card:#1f2329;--tx:#eceef1;--mu:#98a0ab;--bd:#343a43;--empty:#2a2f37}}
@@ -27,7 +27,6 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 .t{aspect-ratio:1;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:clamp(8px,2vw,16px);color:#fff;cursor:pointer;user-select:none;background:var(--empty)}
 .t span{opacity:.5}.noshape .t span{display:none}
 #side{flex:1 1 200px}
-.shake{animation:sh .2s}@keyframes sh{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 </style>
 </head>
 <body>
@@ -81,7 +80,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 <script src="/socket.io/socket.io.js"></script>
 <script src="/game.js"></script>
 <script>
-const COLS=[["#e53935","●"],["#fb8c00","▲"],["#1a237e","■"],["#2e7d32","◆"],["#4fc3f7","★"],["#8e24aa","♥"],["#212121","✚"],["#795548","✖"],["#f48fb1","☾"],["#cddc39","⬢"],["#9e9e9e","✦"],["#00bfa5","▼"]];
+const COLS=[["#e53935","●"],["#fb8c00","▲"],["#2F3CBD","■"],["#43A047","◆"],["#9AFF9E","★"],["#33E9FF","♥"],["#005ED9","✚"],["#8E24AA","✖"],["#FFA6EE","☾"],["#B1B02E","⬢"],["#888888","✦"],["#8D6E63","▼"]];
 const lt=h=>{const n=parseInt(h.slice(1),16);return((n>>16)*299+(n>>8&255)*587+(n&255)*114)/1000>150};
 const $=id=>document.getElementById(id), s=io();
 let room=null,view="lobby",board,endAt=0,tick,sc={};
@@ -133,7 +132,7 @@ function click(y,x){
   if(Date.now()>endAt)return;
   const rem=Game.applyClick(board,y,x);if(rem===null)return;
   s.emit("click",{y,x});
-  if(!rem.length){$("board").classList.add("shake");setTimeout(()=>$("board").classList.remove("shake"),200);tone(140,.15,"square",.06)}else tone(520+Math.min(rem.length,4)*100,.09,"sine",.15);
+  if(!rem.length)tone(140,.15,"square",.06);else tone(520+Math.min(rem.length,4)*100,.09,"sine",.28);
   render();
 }
 function renderScores(){
