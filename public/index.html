@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>컬러 타일 멀티</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--tx:#1c1e21;--mu:#6b7280;--bd:#d9dce1;--ac:#3b6cf6;--empty:#e6e8ec;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14161a;--card:#1f2329;--tx:#eceef1;--mu:#98a0ab;--bd:#343a43;--empty:#2a2f37}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#14161a;--card:#1f2329;--tx:#eceef1;--mu:#98a0ab;--bd:#343a43;--empty:#2a2f37}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;min-height:100vh}
+.wrap{max-width:900px;margin:0 auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:12px}
+h1{text-align:center;margin:8px 0 12px}
+button,select,input[type=text]{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px 14px}
+button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color:#fff}button:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.hidden{display:none!important}.mu{color:var(--mu);font-size:13px}.err{color:#e53935;font-size:14px;min-height:18px}
+.pl{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--bd)}
+.pl.me{font-weight:700;color:var(--ac)}
+.code{font-size:28px;font-weight:800;letter-spacing:4px}
+.top{display:flex;justify-content:space-between;font-weight:700;font-size:18px;margin-bottom:8px}
+.game{display:flex;gap:12px;flex-wrap:wrap}
+#boardBox{flex:1 1 520px;min-width:0}
+#board{display:grid;gap:2px;background:var(--bd);padding:2px;border-radius:8px;touch-action:manipulation}
+.t{aspect-ratio:1;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:clamp(8px,2vw,16px);color:#fff;cursor:pointer;user-select:none;background:var(--empty)}
+.t span{opacity:.5}.noshape .t span{display:none}
+#side{flex:1 1 200px}
+.shake{animation:sh .2s}@keyframes sh{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="row" style="justify-content:flex-end"><button id="theme">🌙</button></div>
+
+<div id="v-lobby">
+  <h1>컬러 타일 멀티</h1>
+  <div class="card">
+    <div class="row"><label>👤 닉네임 <input type="text" id="nick" maxlength="10" placeholder="닉네임"></label></div>
+    <div class="row"><button class="p" id="create">방 생성</button><button id="quick">빠른 입장 (랜덤 매칭)</button></div>
+    <div class="row"><input type="text" id="code" maxlength="4" placeholder="방 코드" style="width:110px;text-transform:uppercase"><button id="join">방 접속</button></div>
+    <div class="err" id="err"></div>
+    <details><summary>하는 방법</summary>
+      <p>빈 칸을 누르면 상·하·좌·우 직선에서 가장 가까운 타일을 찾습니다. 같은 색이 2개 이상이면 제거되고 점수를 얻습니다. 맞는 타일이 없으면 1점 감점(최소 0점)입니다.</p></details>
+  </div>
+</div>
+
+<div id="v-room" class="hidden">
+  <div class="card">
+    <div class="mu">ROOM CODE</div><div class="code" id="rcode">----</div>
+    <div class="row"><button id="copy">🔗 링크 복사</button><button id="leave">나가기</button></div>
+  </div>
+  <div class="card" id="settings">
+    <b>⚙️ 방 설정</b>
+    <div class="row"><label>색상 갯수 <select id="ncol"></select></label>
+    <label><input type="checkbox" id="force"> 강제 시작 (준비 무시)</label></div>
+    <div class="mu" id="hostonly">방장만 변경할 수 있습니다.</div>
+  </div>
+  <div class="card"><b>접속자 목록</b><div id="plist"></div>
+    <div class="row"><button id="ready">준비</button><button class="p" id="go">게임 시작</button></div>
+    <div class="err" id="rmsg"></div></div>
+</div>
+
+<div id="v-game" class="hidden">
+  <div class="top"><span id="time">Time: 120</span><span id="score">Score: 0</span></div>
+  <div class="row"><label><input type="checkbox" id="shape" checked> 모양 표시</label><button id="reshuffle">🔄 판갈기</button></div>
+  <div class="game"><div id="boardBox"><div id="board"></div></div>
+  <div id="side" class="card"><b>점수판</b><div id="scores"></div></div></div>
+</div>
+
+<div id="v-result" class="hidden">
+  <h1>최종 결과</h1>
+  <div class="card"><h3>🏆 순위표</h3><div id="rank"></div></div>
+  <div class="row"><button class="p" id="back">대기실로 돌아가기</button><button id="leave2">나가기</button></div>
+</div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/game.js"></script>
+<script>
+const COLS=[["#e53935","●"],["#fb8c00","▲"],["#1a237e","■"],["#43a047","◆"],["#1e88e5","★"],["#8e24aa","♥"],["#ec407a","✚"],["#6d4c41","✖"],["#757575","☾"],["#00897b","⬢"],["#9e9d24","✦"],["#00acc1","▼"]];
+const $=id=>document.getElementById(id), s=io();
+let room=null,view="lobby",board,endAt=0,tick,sc={};
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function go(v){view=v;["lobby","room","game","result"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!==v))}
+try{$("nick").value=localStorage.getItem("nick")||"";const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}
+$("theme").onclick=()=>{const d=document.documentElement,dk=d.dataset.theme?d.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;d.dataset.theme=dk?"light":"dark";try{localStorage.setItem("theme",d.dataset.theme)}catch(e){}};
+const nick=()=>{const v=$("nick").value.trim()||"플레이어";try{localStorage.setItem("nick",v)}catch(e){}return v};
+const res=r=>{$("err").textContent=r.ok?"":r.msg||"실패"};
+$("create").onclick=()=>s.emit("createRoom",{nick:nick()},res);
+$("quick").onclick=()=>s.emit("quickMatch",{nick:nick()},res);
+$("join").onclick=()=>s.emit("joinRoom",{code:$("code").value,nick:nick()},res);
+const q=new URLSearchParams(location.search).get("room");if(q)$("code").value=q.toUpperCase();
+for(let i=6;i<=12;i++)$("ncol").add(new Option(i,i));
+$("ncol").onchange=$("force").onchange=()=>s.emit("settings",{n:+$("ncol").value,force:$("force").checked});
+$("copy").onclick=()=>{const u=location.origin+"/?room="+room.code;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>$("rmsg").textContent="링크를 복사했습니다.").catch(()=>$("rmsg").textContent=u)};
+const out=()=>{s.emit("leave");room=null;go("lobby")};
+$("leave").onclick=$("leave2").onclick=out;
+$("ready").onclick=()=>{const p=room.players.find(p=>p.id===s.id);s.emit("ready",!p.ready)};
+$("go").onclick=()=>{$("rmsg").textContent="";s.emit("start")};
+$("back").onclick=()=>go("room");
+$("reshuffle").onclick=()=>{if(confirm("점수와 판을 초기화합니다."))s.emit("reshuffle")};
+$("shape").onchange=()=>$("board").classList.toggle("noshape",!$("shape").checked);
+
+s.on("room",r=>{room=r;if(view==="lobby")go("room");renderRoom();if(view==="game")renderScores()});
+s.on("kicked",()=>{room=null;go("lobby");$("err").textContent="방에서 추방되었습니다."});
+function renderRoom(){
+  const host=room.host===s.id,me=room.players.find(p=>p.id===s.id);
+  $("rcode").textContent=room.code;
+  $("ncol").value=room.n;$("force").checked=room.force;
+  $("ncol").disabled=$("force").disabled=!host;$("hostonly").classList.toggle("hidden",host);
+  $("plist").innerHTML=room.players.map(p=>`<div class="pl${p.id===s.id?" me":""}"><span>${p.id===room.host?"👑 ":""}${esc(p.nick)}${p.id===s.id?" (나)":""}</span><span>${p.id===room.host?"방장":p.ready?"✅ 준비":"대기"}${host&&p.id!==s.id?` <button data-k="${p.id}">추방</button>`:""}</span></div>`).join("");
+  $("plist").querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>s.emit("kick",b.dataset.k));
+  $("ready").classList.toggle("hidden",host);$("go").classList.toggle("hidden",!host);
+  $("ready").textContent=me&&me.ready?"준비 취소":"준비";
+  $("go").disabled=!room.force&&room.players.some(p=>p.id!==room.host&&!p.ready);
+}
+function render(){
+  const b=$("board");b.style.gridTemplateColumns=`repeat(${Game.W},1fr)`;b.innerHTML="";
+  board.forEach((row,y)=>row.forEach((v,x)=>{const d=document.createElement("div");d.className="t";
+    if(v>=0){d.style.background=COLS[v][0];d.innerHTML=`<span>${COLS[v][1]}</span>`}
+    d.onclick=()=>click(y,x);b.appendChild(d)}));
+}
+function click(y,x){
+  if(Date.now()>endAt)return;
+  const rem=Game.applyClick(board,y,x);if(rem===null)return;
+  s.emit("click",{y,x});
+  if(!rem.length){$("board").classList.add("shake");setTimeout(()=>$("board").classList.remove("shake"),200);beep()}
+  render();
+}
+function beep(){try{const a=new(window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.type="square";o.frequency.value=140;g.gain.value=.05;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.12)}catch(e){}}
+function renderScores(){
+  const list=room.players.map(p=>({...p,score:sc[p.id]??p.score})).sort((a,b)=>b.score-a.score);
+  $("scores").innerHTML=list.map(p=>`<div class="pl${p.id===s.id?" me":""}"><span>${esc(p.nick)}</span><span>${p.score}</span></div>`).join("");
+  $("score").textContent="Score: "+(sc[s.id]??0);
+}
+s.on("start",({seed,n,ms})=>{
+  board=Game.makeBoard(seed,n);endAt=Date.now()+ms;sc={};render();renderScores();go("game");
+  clearInterval(tick);tick=setInterval(()=>{$("time").textContent="Time: "+Math.max(0,Math.ceil((endAt-Date.now())/1000))},250);
+});
+s.on("board",({seed})=>{board=Game.makeBoard(seed,room.n);render()});
+s.on("scores",a=>{a.forEach(x=>sc[x.id]=x.score);if(view==="game")renderScores()});
+s.on("end",rank=>{
+  clearInterval(tick);endAt=0;
+  $("rank").innerHTML=rank.map((p,i)=>`<div class="pl${p.id===s.id?" me":""}"><span>${i+1}위 ${esc(p.nick)}</span><span>${p.score}점</span></div>`).join("");
+  go("result");
+});
+</script>
+</body>
+</html>

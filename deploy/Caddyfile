@@ -1,0 +1,5 @@
+# 내이름.duckdns.org 를 본인 DuckDNS 주소로 바꾸세요.
+# Caddy가 HTTPS 인증서를 자동 발급하고 WebSocket도 알아서 처리합니다.
+내이름.duckdns.org {
+	reverse_proxy localhost:3000
+}
