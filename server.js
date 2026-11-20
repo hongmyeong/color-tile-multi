@@ -30,7 +30,7 @@ function makeRoom(quick) {
   return r;
 }
 function join(s, r, nick) {
-  r.players.set(s.id, { id: s.id, nick: String(nick || "플레이어").slice(0, 10), ready: false, score: 0, board: null });
+  r.players.set(s.id, { id: s.id, nick: String(nick || "").trim().slice(0, 10) || "플레이어" + (100 + Math.floor(Math.random() * 900)), ready: false, score: 0, board: null });
   s.join(r.code);
   s.data.room = r.code;
   if (!r.host) r.host = s.id;
@@ -78,9 +78,16 @@ io.on("connection", (s) => {
     join(s, r, nick);
     cb({ ok: true, code: r.code });
   });
-  s.on("nick", (nick) => {
+  s.on("nick", (nick, cb) => {
+    const done = typeof cb === "function" ? cb : () => {};
     const r = me(s), p = r && r.players.get(s.id);
-    if (p) { p.nick = String(nick || "플레이어").slice(0, 10); send(r); }
+    if (!p) return done({ ok: false });
+    if (r.state !== "lobby" || p.ready) return done({ ok: false, msg: "준비 완료 상태에서는 변경할 수 없어요." });
+    const v = String(nick || "").trim().slice(0, 10);
+    if (!v) return done({ ok: false, msg: "닉네임을 입력해 주세요." });
+    p.nick = v;
+    send(r);
+    done({ ok: true });
   });
   s.on("ready", (v) => {
     const r = me(s), p = r && r.players.get(s.id);
