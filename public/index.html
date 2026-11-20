@@ -57,6 +57,8 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
     <label><input type="checkbox" id="force"> 강제 시작 (준비 무시)</label></div>
     <div class="mu" id="hostonly">방장만 변경할 수 있습니다.</div>
   </div>
+  <div class="card"><b>🎛️ 내 설정</b> <span class="mu">나에게만 적용돼요</span>
+    <div class="row"><label><input type="checkbox" id="shape"> 타일 문양 표시</label><label><input type="checkbox" id="sfx" checked> 효과음</label></div></div>
   <div class="card"><b>접속자 목록</b><div id="plist"></div>
     <div class="row"><button id="ready">준비</button><button class="p" id="go">게임 시작</button></div>
     <div class="err" id="rmsg"></div></div>
@@ -64,7 +66,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 
 <div id="v-game" class="hidden">
   <div class="top"><span id="time">Time: 120</span><span id="score">Score: 0</span></div>
-  <div class="row"><label><input type="checkbox" id="shape" checked> 모양 표시</label><button id="reshuffle">🔄 판갈기</button></div>
+  <div class="row"><button id="reshuffle">🔄 판갈기</button></div>
   <div class="game"><div id="boardBox"><div id="board"></div></div>
   <div id="side" class="card"><b>점수판</b><div id="scores"></div></div></div>
 </div>
@@ -85,6 +87,11 @@ let room=null,view="lobby",board,endAt=0,tick,sc={};
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function go(v){view=v;["lobby","room","game","result"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!==v))}
 try{$("nick").value=localStorage.getItem("nick")||"";const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}
+let opt={shape:false,sfx:true},ac;
+try{Object.assign(opt,JSON.parse(localStorage.getItem("opt")||"{}"))}catch(e){}
+$("shape").checked=opt.shape;$("sfx").checked=opt.sfx;
+function tone(f,d,type,v){if(!opt.sfx)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();if(ac.state==="suspended")ac.resume();const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime;o.type=type;o.frequency.value=f;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+d)}catch(e){}}
+$("shape").onchange=$("sfx").onchange=()=>{opt.shape=$("shape").checked;opt.sfx=$("sfx").checked;try{localStorage.setItem("opt",JSON.stringify(opt))}catch(e){};tone(660,.08,"sine",.15)};
 $("theme").onclick=()=>{const d=document.documentElement,dk=d.dataset.theme?d.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;d.dataset.theme=dk?"light":"dark";try{localStorage.setItem("theme",d.dataset.theme)}catch(e){}};
 const nick=()=>{const v=$("nick").value.trim()||"플레이어";try{localStorage.setItem("nick",v)}catch(e){}return v};
 const res=r=>{$("err").textContent=r.ok?"":r.msg||"실패"};
@@ -101,7 +108,6 @@ $("ready").onclick=()=>{const p=room.players.find(p=>p.id===s.id);s.emit("ready"
 $("go").onclick=()=>{$("rmsg").textContent="";s.emit("start")};
 $("back").onclick=()=>go("room");
 $("reshuffle").onclick=()=>{if(confirm("점수와 판을 초기화합니다."))s.emit("reshuffle")};
-$("shape").onchange=()=>$("board").classList.toggle("noshape",!$("shape").checked);
 
 s.on("room",r=>{room=r;if(view==="lobby")go("room");renderRoom();if(view==="game")renderScores()});
 s.on("kicked",()=>{room=null;go("lobby");$("err").textContent="방에서 추방되었습니다."});
@@ -119,17 +125,16 @@ function renderRoom(){
 function render(){
   const b=$("board");b.style.gridTemplateColumns=`repeat(${Game.W},1fr)`;b.innerHTML="";
   board.forEach((row,y)=>row.forEach((v,x)=>{const d=document.createElement("div");d.className="t";
-    if(v>=0){d.style.background=COLS[v][0];d.innerHTML=`<span>${COLS[v][1]}</span>`}
+    if(v>=0){d.style.background=COLS[v][0];if(opt.shape)d.innerHTML=`<span>${COLS[v][1]}</span>`}
     d.onclick=()=>click(y,x);b.appendChild(d)}));
 }
 function click(y,x){
   if(Date.now()>endAt)return;
   const rem=Game.applyClick(board,y,x);if(rem===null)return;
   s.emit("click",{y,x});
-  if(!rem.length){$("board").classList.add("shake");setTimeout(()=>$("board").classList.remove("shake"),200);beep()}
+  if(!rem.length){$("board").classList.add("shake");setTimeout(()=>$("board").classList.remove("shake"),200);tone(140,.15,"square",.06)}else tone(520+Math.min(rem.length,4)*100,.09,"sine",.15);
   render();
 }
-function beep(){try{const a=new(window.AudioContext||window.webkitAudioContext)(),o=a.createOscillator(),g=a.createGain();o.type="square";o.frequency.value=140;g.gain.value=.05;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.12)}catch(e){}}
 function renderScores(){
   const list=room.players.map(p=>({...p,score:sc[p.id]??p.score})).sort((a,b)=>b.score-a.score);
   $("scores").innerHTML=list.map(p=>`<div class="pl${p.id===s.id?" me":""}"><span>${esc(p.nick)}</span><span>${p.score}</span></div>`).join("");
