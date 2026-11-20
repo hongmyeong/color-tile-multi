@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>컬러 타일 멀티 v4</title>
+<title>컬러 타일 멀티 v5</title>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--tx:#1c1e21;--mu:#6b7280;--bd:#d9dce1;--ac:#3b6cf6;--empty:#e6e8ec;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14161a;--card:#1f2329;--tx:#eceef1;--mu:#98a0ab;--bd:#343a43;--empty:#2a2f37}}
@@ -36,8 +36,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 <div id="v-lobby">
   <h1>컬러 타일 멀티</h1>
   <div class="card">
-    <div class="row"><label>👤 닉네임 <input type="text" id="nick" maxlength="10" placeholder="닉네임"></label></div>
-    <div class="row"><button class="p" id="create">방 생성</button><button id="quick">빠른 입장 (랜덤 매칭)</button></div>
+      <div class="row"><button class="p" id="create">방 생성</button><button id="quick">빠른 입장 (랜덤 매칭)</button></div>
     <div class="row"><input type="text" id="code" maxlength="4" placeholder="방 코드" style="width:110px;text-transform:uppercase"><button id="join">방 접속</button></div>
     <div class="err" id="err"></div>
     <details><summary>하는 방법</summary>
@@ -50,6 +49,9 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
     <div class="mu">ROOM CODE</div><div class="code" id="rcode">----</div>
     <div class="row"><button id="copy">🔗 링크 복사</button><button id="leave">나가기</button></div>
   </div>
+  <div class="card"><b>👤 내 닉네임</b> <span class="mu">준비 완료 전까지 자유롭게 변경할 수 있어요</span>
+    <div class="row"><input type="text" id="mynick" maxlength="10" placeholder="닉네임"><button id="setnick">변경</button></div>
+    <div class="mu" id="nickmsg"></div></div>
   <div class="card" id="settings">
     <b>⚙️ 방 설정</b>
     <div class="row"><label>색상 갯수 <select id="ncol"></select></label>
@@ -80,20 +82,20 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 <script src="/socket.io/socket.io.js"></script>
 <script src="/game.js"></script>
 <script>
-const COLS=[["#e53935","●"],["#fb8c00","▲"],["#2F3CBD","■"],["#43A047","◆"],["#9AFF9E","★"],["#33E9FF","♥"],["#3B7CFF","✚"],["#8E24AA","✖"],["#FFA6EE","☾"],["#B1B02E","⬢"],["#888888","✦"],["#8D6E63","▼"]];
+const COLS=[["#ED5474","●"],["#FDB400","▲"],["#D4D057","■"],["#B9F0AE","◆"],["#39AB66","★"],["#72F1FF","♥"],["#2E6CDC","✚"],["#8F52D0","✖"],["#FFBDF5","☾"],["#8B8B8B","⬢"],["#896D63","✦"],["#B89AB7","▼"]];
 const lt=h=>{const n=parseInt(h.slice(1),16);return((n>>16)*299+(n>>8&255)*587+(n&255)*114)/1000>150};
 const $=id=>document.getElementById(id), s=io();
 let room=null,view="lobby",board,endAt=0,tick,sc={};
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function go(v){view=v;["lobby","room","game","result"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!==v))}
-try{$("nick").value=localStorage.getItem("nick")||"";const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}
+try{const t=localStorage.getItem("theme");if(t)document.documentElement.dataset.theme=t}catch(e){}
 let opt={shape:false,sfx:true},ac;
 try{Object.assign(opt,JSON.parse(localStorage.getItem("opt")||"{}"))}catch(e){}
 $("shape").checked=opt.shape;$("sfx").checked=opt.sfx;
 function tone(f,d,type,v){if(!opt.sfx)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();if(ac.state==="suspended")ac.resume();const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime;o.type=type;o.frequency.value=f;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+d)}catch(e){}}
 $("shape").onchange=$("sfx").onchange=()=>{opt.shape=$("shape").checked;opt.sfx=$("sfx").checked;try{localStorage.setItem("opt",JSON.stringify(opt))}catch(e){};tone(660,.08,"sine",.15)};
 $("theme").onclick=()=>{const d=document.documentElement,dk=d.dataset.theme?d.dataset.theme==="dark":matchMedia("(prefers-color-scheme:dark)").matches;d.dataset.theme=dk?"light":"dark";try{localStorage.setItem("theme",d.dataset.theme)}catch(e){}};
-const nick=()=>{const v=$("nick").value.trim()||"플레이어";try{localStorage.setItem("nick",v)}catch(e){}return v};
+const nick=()=>{try{return localStorage.getItem("nick")||""}catch(e){return ""}};
 const res=r=>{$("err").textContent=r.ok?"":r.msg||"실패"};
 $("create").onclick=()=>s.emit("createRoom",{nick:nick()},res);
 $("quick").onclick=()=>s.emit("quickMatch",{nick:nick()},res);
@@ -101,6 +103,9 @@ $("join").onclick=()=>s.emit("joinRoom",{code:$("code").value,nick:nick()},res);
 const q=new URLSearchParams(location.search).get("room");if(q)$("code").value=q.toUpperCase();
 for(let i=6;i<=12;i++)$("ncol").add(new Option(i,i));
 $("ncol").onchange=$("force").onchange=()=>s.emit("settings",{n:+$("ncol").value,force:$("force").checked});
+function sendNick(){const v=$("mynick").value.trim();if(!v){$("nickmsg").textContent="닉네임을 입력해 주세요.";return}
+  s.emit("nick",v,r=>{$("nickmsg").textContent=r&&r.ok?"변경했어요.":(r&&r.msg)||"변경할 수 없어요.";if(r&&r.ok)try{localStorage.setItem("nick",v)}catch(e){}})}
+$("setnick").onclick=sendNick;$("mynick").onkeydown=e=>{if(e.key==="Enter")sendNick()};
 $("copy").onclick=()=>{const u=location.origin+"/?room="+room.code;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>$("rmsg").textContent="링크를 복사했습니다.").catch(()=>$("rmsg").textContent=u)};
 const out=()=>{s.emit("leave");room=null;go("lobby")};
 $("leave").onclick=$("leave2").onclick=out;
@@ -120,6 +125,10 @@ function renderRoom(){
   $("plist").querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>s.emit("kick",b.dataset.k));
   $("ready").classList.toggle("hidden",host);$("go").classList.toggle("hidden",!host);
   $("ready").textContent=me&&me.ready?"준비 취소":"준비";
+  const nm=$("mynick"),RM="준비 취소 후 닉네임을 변경할 수 있어요.";
+  if(document.activeElement!==nm)nm.value=me?me.nick:"";
+  nm.disabled=$("setnick").disabled=!!(me&&me.ready);
+  if(me&&me.ready)$("nickmsg").textContent=RM;else if($("nickmsg").textContent===RM)$("nickmsg").textContent="";
   $("go").disabled=!room.force&&room.players.some(p=>p.id!==room.host&&!p.ready);
 }
 function render(){
