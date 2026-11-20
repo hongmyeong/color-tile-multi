@@ -18,7 +18,7 @@ const newCode = () => {
 };
 const pub = (r) => ({
   code: r.code, host: r.host, state: r.state, n: r.n, force: r.force,
-  players: [...r.players.values()].map((p) => ({ id: p.id, nick: p.nick, ready: p.ready, score: p.score })),
+  players: [...r.players.values()].map((p) => ({ id: p.id, nick: p.nick, ready: p.ready, st: p.st, score: p.score })),
 });
 const send = (r) => io.to(r.code).emit("room", pub(r));
 const me = (s) => rooms.get(s.data.room);
@@ -30,7 +30,7 @@ function makeRoom(quick) {
   return r;
 }
 function join(s, r, nick) {
-  r.players.set(s.id, { id: s.id, nick: String(nick || "").trim().slice(0, 10) || "플레이어" + (100 + Math.floor(Math.random() * 900)), ready: false, score: 0, board: null });
+  r.players.set(s.id, { id: s.id, nick: String(nick || "").trim().slice(0, 10) || "플레이어" + (100 + Math.floor(Math.random() * 900)), ready: false, st: "lobby", score: 0, board: null });
   s.join(r.code);
   s.data.room = r.code;
   if (!r.host) r.host = s.id;
@@ -44,14 +44,16 @@ function leave(s) {
   s.data.room = null;
   if (!r.players.size) { clearTimeout(r.timer); rooms.delete(r.code); return; }
   if (r.host === s.id) r.host = r.players.keys().next().value;
+  if (r.state === "playing" && ![...r.players.values()].some((p) => p.st === "playing")) { end(r); return; }
   send(r);
 }
 function end(r) {
   if (r.state !== "playing") return;
+  clearTimeout(r.timer);
   r.state = "lobby";
-  const ranking = [...r.players.values()].map((p) => ({ id: p.id, nick: p.nick, score: p.score })).sort((a, b) => b.score - a.score);
-  r.players.forEach((p) => { p.ready = false; });
-  io.to(r.code).emit("end", ranking);
+  const ps = [...r.players.values()].filter((p) => p.st === "playing");
+  const ranking = ps.map((p) => ({ id: p.id, nick: p.nick, score: p.score })).sort((a, b) => b.score - a.score);
+  ps.forEach((p) => { p.ready = false; p.st = "result"; io.to(p.id).emit("end", ranking); });
   send(r);
 }
 
@@ -65,7 +67,6 @@ io.on("connection", (s) => {
   s.on("joinRoom", ({ code, nick } = {}, cb = () => {}) => {
     const r = rooms.get(String(code || "").toUpperCase());
     if (!r) return cb({ ok: false, msg: "존재하지 않는 방 코드입니다." });
-    if (r.state !== "lobby") return cb({ ok: false, msg: "게임이 진행 중입니다." });
     if (r.players.size >= MAX) return cb({ ok: false, msg: "방이 가득 찼습니다." });
     leave(s);
     join(s, r, nick);
@@ -82,7 +83,8 @@ io.on("connection", (s) => {
     const done = typeof cb === "function" ? cb : () => {};
     const r = me(s), p = r && r.players.get(s.id);
     if (!p) return done({ ok: false });
-    if (r.state !== "lobby" || p.ready) return done({ ok: false, msg: "준비 완료 상태에서는 변경할 수 없어요." });
+    if (p.st === "playing") return done({ ok: false, msg: "게임 중에는 변경할 수 없어요." });
+    if (p.ready) return done({ ok: false, msg: "준비 완료 상태에서는 변경할 수 없어요." });
     const v = String(nick || "").trim().slice(0, 10);
     if (!v) return done({ ok: false, msg: "닉네임을 입력해 주세요." });
     p.nick = v;
@@ -91,7 +93,7 @@ io.on("connection", (s) => {
   });
   s.on("ready", (v) => {
     const r = me(s), p = r && r.players.get(s.id);
-    if (p && r.state === "lobby") { p.ready = !!v; send(r); }
+    if (p && p.st === "lobby") { p.ready = !!v; send(r); }
   });
   s.on("settings", ({ n, force } = {}) => {
     const r = me(s);
@@ -109,19 +111,22 @@ io.on("connection", (s) => {
   s.on("start", () => {
     const r = me(s);
     if (!r || r.host !== s.id || r.state !== "lobby") return;
-    const ps = [...r.players.values()];
+    const hp = r.players.get(s.id);
+    if (!hp || hp.st !== "lobby") return;
+    // 대기실에 있는 사람만 참가 (결과 확인 중인 사람은 제외)
+    const ps = [...r.players.values()].filter((p) => p.st === "lobby");
     if (!r.force && ps.some((p) => p.id !== r.host && !p.ready)) return;
     r.state = "playing";
     r.endAt = Date.now() + DUR * 1000;
     const seed = rnd();
-    ps.forEach((p) => { p.score = 0; p.board = G.makeBoard(seed, r.n); });
-    io.to(r.code).emit("start", { seed, n: r.n, ms: DUR * 1000 });
+    ps.forEach((p) => { p.score = 0; p.board = G.makeBoard(seed, r.n); p.st = "playing"; });
     send(r);
+    ps.forEach((p) => io.to(p.id).emit("start", { seed, n: r.n, ms: DUR * 1000 }));
     r.timer = setTimeout(() => end(r), DUR * 1000);
   });
   s.on("click", ({ y, x } = {}) => {
     const r = me(s), p = r && r.players.get(s.id);
-    if (!p || r.state !== "playing" || Date.now() > r.endAt + 300) return;
+    if (!p || r.state !== "playing" || p.st !== "playing" || Date.now() > r.endAt + 300) return;
     if (!Number.isInteger(y) || !Number.isInteger(x) || y < 0 || y >= G.H || x < 0 || x >= G.W) return;
     const rem = G.applyClick(p.board, y, x);
     if (rem === null) return;
@@ -130,12 +135,16 @@ io.on("connection", (s) => {
   });
   s.on("reshuffle", () => {
     const r = me(s), p = r && r.players.get(s.id);
-    if (!p || r.state !== "playing") return;
+    if (!p || r.state !== "playing" || p.st !== "playing") return;
     const seed = rnd();
     p.board = G.makeBoard(seed, r.n);
     p.score = 0;
     s.emit("board", { seed });
     scores(r);
+  });
+  s.on("back", () => {
+    const r = me(s), p = r && r.players.get(s.id);
+    if (p && p.st === "result") { p.st = "lobby"; p.ready = false; send(r); }
   });
   s.on("leave", () => leave(s));
   s.on("disconnect", () => leave(s));
