@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>컬러 타일 멀티 v7</title>
+<title>컬러 타일 멀티 v8</title>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--tx:#1c1e21;--mu:#6b7280;--bd:#d9dce1;--ac:#3b6cf6;--empty:#e6e8ec;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14161a;--card:#1f2329;--tx:#eceef1;--mu:#98a0ab;--bd:#343a43;--empty:#2a2f37}}
@@ -23,8 +23,10 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 .top{display:flex;justify-content:space-between;font-weight:700;font-size:18px;margin-bottom:8px}
 .game{display:flex;gap:12px;flex-wrap:wrap}
 #boardBox{flex:1 1 520px;min-width:0}
-#board{display:grid;gap:2px;background:var(--bd);padding:2px;border-radius:8px;touch-action:manipulation}
+#board{display:grid;gap:3px;background:var(--bd);padding:2px;border-radius:8px;touch-action:manipulation}
 .t{aspect-ratio:1;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:clamp(8px,2vw,16px);color:#fff;cursor:pointer;user-select:none;background:var(--empty)}
+.t.f{background-image:linear-gradient(155deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,0) 48%,rgba(0,0,0,.2) 100%);box-shadow:inset 0 1.5px 0 rgba(255,255,255,.6),inset 0 -3px 0 rgba(0,0,0,.28),0 2px 3px rgba(0,0,0,.3)}
+.t.f span{text-shadow:0 1px 1px rgba(0,0,0,.25)}
 .t span{opacity:.5}.noshape .t span{display:none}
 #side{flex:1 1 200px}
 </style>
@@ -133,8 +135,8 @@ function renderRoom(){
 }
 function render(){
   const b=$("board");b.style.gridTemplateColumns=`repeat(${Game.W},1fr)`;b.innerHTML="";
-  board.forEach((row,y)=>row.forEach((v,x)=>{const d=document.createElement("div");d.className="t";
-    if(v>=0){d.style.background=COLS[v][0];d.style.color=lt(COLS[v][0])?"#000":"#fff";if(opt.shape)d.innerHTML=`<span>${COLS[v][1]}</span>`}
+  board.forEach((row,y)=>row.forEach((v,x)=>{const d=document.createElement("div");d.className="t"+(v>=0?" f":"");
+    if(v>=0){d.style.backgroundColor=COLS[v][0];d.style.color=lt(COLS[v][0])?"#000":"#fff";if(opt.shape)d.innerHTML=`<span>${COLS[v][1]}</span>`}
     d.onclick=()=>click(y,x);b.appendChild(d)}));
 }
 function click(y,x){
