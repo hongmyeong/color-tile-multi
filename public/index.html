@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>컬러 타일 멀티 v8</title>
+<title>컬러 타일 멀티 v9</title>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--tx:#1c1e21;--mu:#6b7280;--bd:#d9dce1;--ac:#3b6cf6;--empty:#e6e8ec;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14161a;--card:#1f2329;--tx:#eceef1;--mu:#98a0ab;--bd:#343a43;--empty:#2a2f37}}
@@ -23,10 +23,8 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 .top{display:flex;justify-content:space-between;font-weight:700;font-size:18px;margin-bottom:8px}
 .game{display:flex;gap:12px;flex-wrap:wrap}
 #boardBox{flex:1 1 520px;min-width:0}
-#board{display:grid;gap:3px;background:var(--bd);padding:2px;border-radius:8px;touch-action:manipulation}
+#board{display:grid;gap:2px;background:var(--bd);padding:2px;border-radius:8px;touch-action:manipulation}
 .t{aspect-ratio:1;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:clamp(8px,2vw,16px);color:#fff;cursor:pointer;user-select:none;background:var(--empty)}
-.t.f{background-image:linear-gradient(155deg,rgba(255,255,255,.42) 0%,rgba(255,255,255,0) 48%,rgba(0,0,0,.2) 100%);box-shadow:inset 0 1.5px 0 rgba(255,255,255,.6),inset 0 -3px 0 rgba(0,0,0,.28),0 2px 3px rgba(0,0,0,.3)}
-.t.f span{text-shadow:0 1px 1px rgba(0,0,0,.25)}
 .t span{opacity:.5}.noshape .t span{display:none}
 #side{flex:1 1 200px}
 </style>
@@ -62,7 +60,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
   </div>
   <div class="card"><b>🎛️ 내 설정</b> <span class="mu">나에게만 적용돼요</span>
     <div class="row"><label><input type="checkbox" id="shape"> 타일 문양 표시</label><label><input type="checkbox" id="sfx" checked> 효과음</label></div></div>
-  <div class="card"><b>접속자 목록</b><div id="plist"></div>
+  <div class="card"><b>접속자 목록</b><div id="plist"></div><div class="mu" id="gmsg" style="margin-top:8px"></div>
     <div class="row"><button id="ready">준비</button><button class="p" id="go">게임 시작</button></div>
     <div class="err" id="rmsg"></div></div>
 </div>
@@ -113,30 +111,32 @@ const out=()=>{s.emit("leave");room=null;go("lobby")};
 $("leave").onclick=$("leave2").onclick=out;
 $("ready").onclick=()=>{const p=room.players.find(p=>p.id===s.id);s.emit("ready",!p.ready)};
 $("go").onclick=()=>{$("rmsg").textContent="";s.emit("start")};
-$("back").onclick=()=>go("room");
+$("back").onclick=()=>{s.emit("back");go("room")};
 $("reshuffle").onclick=()=>{if(confirm("점수와 판을 초기화합니다."))s.emit("reshuffle")};
 
 s.on("room",r=>{room=r;if(view==="lobby")go("room");renderRoom();if(view==="game")renderScores()});
 s.on("kicked",()=>{room=null;go("lobby");$("err").textContent="방에서 추방되었습니다."});
+const stLabel=p=>p.st==="playing"?"🎮 게임 중":p.st==="result"?"📋 결과 확인 중":p.id===room.host?"방장":p.ready?"✅ 준비":"대기";
 function renderRoom(){
   const host=room.host===s.id,me=room.players.find(p=>p.id===s.id);
   $("rcode").textContent=room.code;
   $("ncol").value=room.n;$("force").checked=room.force;
   $("ncol").disabled=$("force").disabled=!host;$("hostonly").classList.toggle("hidden",host);
-  $("plist").innerHTML=room.players.map(p=>`<div class="pl${p.id===s.id?" me":""}"><span>${p.id===room.host?"👑 ":""}${esc(p.nick)}${p.id===s.id?" (나)":""}</span><span>${p.id===room.host?"방장":p.ready?"✅ 준비":"대기"}${host&&p.id!==s.id?` <button data-k="${p.id}">추방</button>`:""}</span></div>`).join("");
+  $("plist").innerHTML=room.players.map(p=>`<div class="pl${p.id===s.id?" me":""}"><span>${p.id===room.host?"👑 ":""}${esc(p.nick)}${p.id===s.id?" (나)":""}</span><span>${stLabel(p)}${host&&p.id!==s.id?` <button data-k="${p.id}">추방</button>`:""}</span></div>`).join("");
   $("plist").querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>s.emit("kick",b.dataset.k));
   $("ready").classList.toggle("hidden",host);$("go").classList.toggle("hidden",!host);
   $("ready").textContent=me&&me.ready?"준비 취소":"준비";
   const nm=$("mynick"),RM="준비 취소 후 닉네임을 변경할 수 있어요.";
   if(document.activeElement!==nm)nm.value=me?me.nick:"";
-  nm.disabled=$("setnick").disabled=!!(me&&me.ready);
+  nm.disabled=$("setnick").disabled=!!(me&&(me.ready||me.st==="playing"));
   if(me&&me.ready)$("nickmsg").textContent=RM;else if($("nickmsg").textContent===RM)$("nickmsg").textContent="";
-  $("go").disabled=!room.force&&room.players.some(p=>p.id!==room.host&&!p.ready);
+  $("go").disabled=room.state==="playing"||(!room.force&&room.players.some(p=>p.st==="lobby"&&p.id!==room.host&&!p.ready));
+  $("gmsg").textContent=room.state==="playing"?"게임이 진행 중이에요. 끝나면 시작할 수 있어요.":"";
 }
 function render(){
   const b=$("board");b.style.gridTemplateColumns=`repeat(${Game.W},1fr)`;b.innerHTML="";
-  board.forEach((row,y)=>row.forEach((v,x)=>{const d=document.createElement("div");d.className="t"+(v>=0?" f":"");
-    if(v>=0){d.style.backgroundColor=COLS[v][0];d.style.color=lt(COLS[v][0])?"#000":"#fff";if(opt.shape)d.innerHTML=`<span>${COLS[v][1]}</span>`}
+  board.forEach((row,y)=>row.forEach((v,x)=>{const d=document.createElement("div");d.className="t";
+    if(v>=0){d.style.background=COLS[v][0];d.style.color=lt(COLS[v][0])?"#000":"#fff";if(opt.shape)d.innerHTML=`<span>${COLS[v][1]}</span>`}
     d.onclick=()=>click(y,x);b.appendChild(d)}));
 }
 function click(y,x){
@@ -147,7 +147,7 @@ function click(y,x){
   render();
 }
 function renderScores(){
-  const list=room.players.map(p=>({...p,score:sc[p.id]??p.score})).sort((a,b)=>b.score-a.score);
+  const list=room.players.filter(p=>p.st==="playing").map(p=>({...p,score:sc[p.id]??p.score})).sort((a,b)=>b.score-a.score);
   $("scores").innerHTML=list.map(p=>`<div class="pl${p.id===s.id?" me":""}"><span>${esc(p.nick)}</span><span>${p.score}</span></div>`).join("");
   $("score").textContent="Score: "+(sc[s.id]??0);
 }
