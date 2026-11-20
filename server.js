@@ -96,7 +96,7 @@ io.on("connection", (s) => {
   s.on("settings", ({ n, force } = {}) => {
     const r = me(s);
     if (!r || r.host !== s.id || r.state !== "lobby") return;
-    if (n >= 6 && n <= 12) r.n = n | 0;
+    if (n >= 6 && n <= 11) r.n = n | 0;
     r.force = !!force;
     send(r);
   });
