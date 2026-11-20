@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>컬러 타일 멀티 v3</title>
+<title>컬러 타일 멀티 v4</title>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--tx:#1c1e21;--mu:#6b7280;--bd:#d9dce1;--ac:#3b6cf6;--empty:#e6e8ec;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14161a;--card:#1f2329;--tx:#eceef1;--mu:#98a0ab;--bd:#343a43;--empty:#2a2f37}}
@@ -80,7 +80,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 <script src="/socket.io/socket.io.js"></script>
 <script src="/game.js"></script>
 <script>
-const COLS=[["#e53935","●"],["#fb8c00","▲"],["#2F3CBD","■"],["#43A047","◆"],["#9AFF9E","★"],["#33E9FF","♥"],["#005ED9","✚"],["#8E24AA","✖"],["#FFA6EE","☾"],["#B1B02E","⬢"],["#888888","✦"],["#8D6E63","▼"]];
+const COLS=[["#e53935","●"],["#fb8c00","▲"],["#2F3CBD","■"],["#43A047","◆"],["#9AFF9E","★"],["#33E9FF","♥"],["#3B7CFF","✚"],["#8E24AA","✖"],["#FFA6EE","☾"],["#B1B02E","⬢"],["#888888","✦"],["#8D6E63","▼"]];
 const lt=h=>{const n=parseInt(h.slice(1),16);return((n>>16)*299+(n>>8&255)*587+(n&255)*114)/1000>150};
 const $=id=>document.getElementById(id), s=io();
 let room=null,view="lobby",board,endAt=0,tick,sc={};
@@ -132,7 +132,7 @@ function click(y,x){
   if(Date.now()>endAt)return;
   const rem=Game.applyClick(board,y,x);if(rem===null)return;
   s.emit("click",{y,x});
-  if(!rem.length)tone(140,.15,"square",.06);else tone(520+Math.min(rem.length,4)*100,.09,"sine",.28);
+  if(!rem.length)tone(140,.15,"square",.28);else tone(520+Math.min(rem.length,4)*100,.09,"sine",.28);
   render();
 }
 function renderScores(){
