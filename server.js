@@ -17,7 +17,7 @@ const newCode = () => {
   return c;
 };
 const pub = (r) => ({
-  code: r.code, host: r.host, state: r.state, n: r.n, force: r.force,
+  code: r.code, host: r.host, state: r.state, n: r.n, mode: r.mode, force: r.force,
   players: [...r.players.values()].map((p) => ({ id: p.id, nick: p.nick, ready: p.ready, st: p.st, score: p.score })),
 });
 const send = (r) => io.to(r.code).emit("room", pub(r));
@@ -25,7 +25,7 @@ const me = (s) => rooms.get(s.data.room);
 const scores = (r) => io.to(r.code).emit("scores", [...r.players.values()].map((q) => ({ id: q.id, score: q.score })));
 
 function makeRoom(quick) {
-  const r = { code: newCode(), host: null, state: "lobby", n: 11, force: false, quick, players: new Map(), timer: null, endAt: 0 };
+  const r = { code: newCode(), host: null, state: "lobby", n: 12, mode: 1, force: false, quick, players: new Map(), timer: null, endAt: 0 };
   rooms.set(r.code, r);
   return r;
 }
@@ -95,9 +95,10 @@ io.on("connection", (s) => {
     const r = me(s), p = r && r.players.get(s.id);
     if (p && p.st === "lobby") { p.ready = !!v; send(r); }
   });
-  s.on("settings", ({ force } = {}) => {
+  s.on("settings", ({ force, mode } = {}) => {
     const r = me(s);
     if (!r || r.host !== s.id || r.state !== "lobby") return;
+    if (mode === 1 || mode === 2) r.mode = mode;
     r.force = !!force;
     send(r);
   });
@@ -120,7 +121,7 @@ io.on("connection", (s) => {
     const seed = rnd();
     ps.forEach((p) => { p.score = 0; p.board = G.makeBoard(seed, r.n); p.st = "playing"; });
     send(r);
-    ps.forEach((p) => io.to(p.id).emit("start", { seed, n: r.n, ms: DUR * 1000 }));
+    ps.forEach((p) => io.to(p.id).emit("start", { seed, n: r.n, mode: r.mode, ms: DUR * 1000 }));
     r.timer = setTimeout(() => end(r), DUR * 1000);
   });
   s.on("click", ({ y, x } = {}) => {
