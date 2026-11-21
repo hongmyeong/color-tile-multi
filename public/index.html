@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>컬러 타일 멀티 v16</title>
+<title>컬러 타일 멀티 v17</title>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--tx:#1c1e21;--mu:#6b7280;--bd:#d9dce1;--ac:#3b6cf6;--empty:#e6e8ec;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14161a;--card:#1f2329;--tx:#eceef1;--mu:#98a0ab;--bd:#343a43;--empty:#2a2f37}}
@@ -112,13 +112,16 @@ const res=r=>{$("err").textContent=r.ok?"":r.msg||"실패"};
 $("create").onclick=()=>s.emit("createRoom",{nick:nick()},res);
 $("quick").onclick=()=>s.emit("quickMatch",{nick:nick()},res);
 $("join").onclick=()=>s.emit("joinRoom",{code:$("code").value,nick:nick()},res);
-const q=new URLSearchParams(location.search).get("room");if(q)$("code").value=q.toUpperCase();
+const q=(new URLSearchParams(location.search).get("room")||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,4);
+const cleanUrl=()=>{try{history.replaceState(null,"",location.pathname)}catch(e){}};
+// 초대 링크(/?room=코드)로 열면 바로 그 방에 접속
+if(q){$("code").value=q;$("err").textContent="방에 접속하는 중...";s.emit("joinRoom",{code:q,nick:nick()},res)}
 $("force").onchange=$("cmode").onchange=()=>s.emit("settings",{force:$("force").checked,mode:+$("cmode").value});
 function sendNick(){const v=$("mynick").value.trim();if(!v){$("nickmsg").textContent="닉네임을 입력해 주세요.";return}
   s.emit("nick",v,r=>{$("nickmsg").textContent=r&&r.ok?"변경했어요.":(r&&r.msg)||"변경할 수 없어요.";if(r&&r.ok)try{localStorage.setItem("nick",v)}catch(e){}})}
 $("setnick").onclick=sendNick;$("mynick").onkeydown=e=>{if(e.key==="Enter")sendNick()};
 $("copy").onclick=()=>{const u=location.origin+"/?room="+room.code;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>$("rmsg").textContent="링크를 복사했습니다.").catch(()=>$("rmsg").textContent=u)};
-const out=()=>{s.emit("leave");room=null;go("lobby")};
+const out=()=>{s.emit("leave");room=null;cleanUrl();go("lobby")};
 $("leave").onclick=$("leave2").onclick=out;
 $("ready").onclick=()=>{const p=room.players.find(p=>p.id===s.id);s.emit("ready",!p.ready)};
 $("go").onclick=()=>{$("rmsg").textContent="";s.emit("start")};
@@ -126,7 +129,7 @@ $("back").onclick=()=>{s.emit("back");go("room")};
 $("reshuffle").onclick=()=>{if(confirm("점수와 판을 초기화합니다."))s.emit("reshuffle")};
 
 s.on("room",r=>{room=r;if(view==="lobby")go("room");renderRoom();if(view==="game")renderScores()});
-s.on("kicked",()=>{room=null;go("lobby");$("err").textContent="방에서 추방되었습니다."});
+s.on("kicked",()=>{room=null;cleanUrl();go("lobby");$("err").textContent="방에서 추방되었습니다."});
 const stLabel=p=>p.st==="playing"?"🎮 게임 중":p.st==="result"?"📋 결과 확인 중":p.id===room.host?"방장":p.ready?"✅ 준비":"대기";
 function renderRoom(){
   const host=room.host===s.id,me=room.players.find(p=>p.id===s.id);
