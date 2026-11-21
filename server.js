@@ -25,7 +25,7 @@ const me = (s) => rooms.get(s.data.room);
 const scores = (r) => io.to(r.code).emit("scores", [...r.players.values()].map((q) => ({ id: q.id, score: q.score })));
 
 function makeRoom(quick) {
-  const r = { code: newCode(), host: null, state: "lobby", n: 10, force: false, quick, players: new Map(), timer: null, endAt: 0 };
+  const r = { code: newCode(), host: null, state: "lobby", n: 11, force: false, quick, players: new Map(), timer: null, endAt: 0 };
   rooms.set(r.code, r);
   return r;
 }
@@ -95,10 +95,9 @@ io.on("connection", (s) => {
     const r = me(s), p = r && r.players.get(s.id);
     if (p && p.st === "lobby") { p.ready = !!v; send(r); }
   });
-  s.on("settings", ({ n, force } = {}) => {
+  s.on("settings", ({ force } = {}) => {
     const r = me(s);
     if (!r || r.host !== s.id || r.state !== "lobby") return;
-    if (n === 10 || n === 11) r.n = n;
     r.force = !!force;
     send(r);
   });
