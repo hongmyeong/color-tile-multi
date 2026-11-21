@@ -3,14 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>컬러 타일 멀티 v10</title>
+<title>컬러 타일 멀티 v11</title>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--tx:#1c1e21;--mu:#6b7280;--bd:#d9dce1;--ac:#3b6cf6;--empty:#e6e8ec;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14161a;--card:#1f2329;--tx:#eceef1;--mu:#98a0ab;--bd:#343a43;--empty:#2a2f37}}
 :root[data-theme="dark"]{color-scheme:dark;--bg:#14161a;--card:#1f2329;--tx:#eceef1;--mu:#98a0ab;--bd:#343a43;--empty:#2a2f37}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;min-height:100vh}
-.wrap{max-width:900px;margin:0 auto;padding:16px}
+.wrap{max-width:1100px;margin:0 auto;padding:16px}
+#v-lobby,#v-room,#v-result{max-width:900px;margin:0 auto}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:12px}
 h1{text-align:center;margin:8px 0 12px}
 button,select,input[type=text]{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px 14px}
@@ -22,11 +23,14 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 .code{font-size:28px;font-weight:800;letter-spacing:4px}
 .top{display:flex;justify-content:space-between;font-weight:700;font-size:18px;margin-bottom:8px}
 .game{display:flex;gap:12px;flex-wrap:wrap}
-#boardBox{flex:1 1 520px;min-width:0}
-#board{display:grid;gap:2px;background:var(--bd);padding:2px;border-radius:8px;touch-action:manipulation}
-.t{aspect-ratio:1;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:clamp(8px,2vw,16px);color:#fff;cursor:pointer;user-select:none;background:var(--empty)}
-.t span{opacity:.5}.noshape .t span{display:none}
-#side{flex:1 1 200px}
+#boardBox{flex:1 1 640px;min-width:0}
+#board{display:grid;gap:3px;background:#10305c;padding:6px;border-radius:14px;border:2px solid #2a5a9c;box-shadow:0 0 0 3px #0c2142,0 6px 18px rgba(0,0,0,.5);touch-action:manipulation}
+.t{aspect-ratio:1;border-radius:5px;position:relative;display:flex;align-items:center;justify-content:center;font-size:clamp(9px,1.7vw,18px);color:#fff;cursor:pointer;user-select:none;background:#0a2244;box-shadow:inset 0 0 0 1px rgba(90,140,210,.16)}
+.t.f{background-image:linear-gradient(180deg,rgba(255,255,255,.3) 0%,rgba(255,255,255,0) 50%,rgba(0,0,0,.2) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 1px rgba(0,0,0,.25),0 1px 3px rgba(0,0,0,.55)}
+.t.f::before{content:"";position:absolute;left:10%;right:10%;top:7%;height:34%;border-radius:4px 4px 10px 10px;background:linear-gradient(180deg,rgba(255,255,255,.55),rgba(255,255,255,.05));pointer-events:none}
+.t span{position:relative;z-index:1;opacity:.5}.noshape .t span{display:none}
+#side{flex:0 0 220px}
+@media (max-width:820px){#side{flex:1 1 100%}}
 </style>
 </head>
 <body>
@@ -130,8 +134,8 @@ function renderRoom(){
 }
 function render(){
   const b=$("board");b.style.gridTemplateColumns=`repeat(${Game.W},1fr)`;b.innerHTML="";
-  board.forEach((row,y)=>row.forEach((v,x)=>{const d=document.createElement("div");d.className="t";
-    if(v>=0){d.style.background=COLS[v][0];d.style.color=lt(COLS[v][0])?"#000":"#fff";if(opt.shape)d.innerHTML=`<span>${COLS[v][1]}</span>`}
+  board.forEach((row,y)=>row.forEach((v,x)=>{const d=document.createElement("div");d.className="t"+(v>=0?" f":"");
+    if(v>=0){d.style.backgroundColor=COLS[v][0];d.style.color=lt(COLS[v][0])?"#000":"#fff";if(opt.shape)d.innerHTML=`<span>${COLS[v][1]}</span>`}
     d.onclick=()=>click(y,x);b.appendChild(d)}));
 }
 function click(y,x){
