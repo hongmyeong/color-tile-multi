@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>컬러 타일 멀티 v14</title>
+<title>컬러 타일 멀티 v15</title>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--tx:#1c1e21;--mu:#6b7280;--bd:#d9dce1;--ac:#3b6cf6;--empty:#e6e8ec;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14161a;--card:#1f2329;--tx:#eceef1;--mu:#98a0ab;--bd:#343a43;--empty:#2a2f37}}
@@ -25,8 +25,10 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 .game{display:flex;gap:12px;flex-wrap:wrap}
 #boardBox{flex:1 1 640px;min-width:0}
 #board{display:grid;gap:3px;background:var(--bd);padding:2px;border-radius:8px;touch-action:manipulation}
-.t{aspect-ratio:1;border-radius:12%;display:flex;align-items:center;justify-content:center;font-size:clamp(9px,1.7vw,18px);color:#fff;cursor:pointer;user-select:none;background:var(--empty)}
-.t span{opacity:.5}.noshape .t span{display:none}
+.t{aspect-ratio:1;border-radius:12%;position:relative;display:flex;align-items:center;justify-content:center;font-size:clamp(9px,1.7vw,18px);color:#fff;cursor:pointer;user-select:none;background:var(--empty)}
+.t span{opacity:.5}
+.ghost{position:absolute;inset:0;border-radius:inherit;display:flex;align-items:center;justify-content:center;pointer-events:none;animation:pop .2s ease-out forwards}
+@keyframes pop{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.65)}}.noshape .t span{display:none}
 #side{flex:0 0 220px}
 @media (max-width:820px){#side{flex:1 1 100%}}
 </style>
@@ -143,18 +145,20 @@ function renderRoom(){
   $("go").disabled=room.state==="playing"||(!room.force&&room.players.some(p=>p.st==="lobby"&&p.id!==room.host&&!p.ready));
   $("gmsg").textContent=room.state==="playing"?"게임이 진행 중이에요. 끝나면 시작할 수 있어요.":"";
 }
-function render(){
+function render(gh){
   const b=$("board");b.style.gridTemplateColumns=`repeat(${Game.W},1fr)`;b.innerHTML="";
   board.forEach((row,y)=>row.forEach((v,x)=>{const d=document.createElement("div");d.className="t";
     if(v>=0){d.style.background=GR[mode][v];d.style.color=lt(PALS[mode][v])?"#000":"#fff";if(opt.shape)d.innerHTML=`<span>${GLY[v]}</span>`}
     d.onclick=()=>click(y,x);b.appendChild(d)}));
+  (gh||[]).forEach(([y,x,v])=>{const g=document.createElement("i");g.className="ghost";g.style.background=GR[mode][v];g.style.color=lt(PALS[mode][v])?"#000":"#fff";
+    if(opt.shape)g.innerHTML=`<span>${GLY[v]}</span>`;g.onanimationend=()=>g.remove();b.children[y*Game.W+x].appendChild(g)});
 }
 function click(y,x){
   if(Date.now()>endAt)return;
-  const rem=Game.applyClick(board,y,x);if(rem===null)return;
+  const snap=board.map(r=>r.slice()),rem=Game.applyClick(board,y,x);if(rem===null)return;
   s.emit("click",{y,x});
   if(!rem.length)tone(140,.15,"square",.28);else tone(520+Math.min(rem.length,4)*100,.09,"sine",.28);
-  render();
+  render(rem.map(([j,i])=>[j,i,snap[j][i]]));
 }
 function renderScores(){
   const list=room.players.filter(p=>p.st==="playing").map(p=>({...p,score:sc[p.id]??p.score})).sort((a,b)=>b.score-a.score);
