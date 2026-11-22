@@ -27,7 +27,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 .top{display:flex;justify-content:space-between;font-weight:700;font-size:18px;margin-bottom:8px}
 .game{display:flex;gap:12px;flex-wrap:wrap}
 #boardBox{flex:1 1 640px;min-width:0}
-#board{display:grid;gap:3px;background:var(--bd);padding:2px;border-radius:8px;touch-action:manipulation}
+#board{display:grid;gap:2px;background:var(--bd);padding:2px;border-radius:8px;touch-action:manipulation}
 .t{aspect-ratio:1;border-radius:12%;position:relative;display:flex;align-items:center;justify-content:center;font-size:clamp(9px,1.7vw,18px);color:#fff;cursor:pointer;user-select:none;background:var(--empty)}
 .t span{opacity:.5}
 .ghost{position:absolute;inset:0;border-radius:inherit;display:flex;align-items:center;justify-content:center;pointer-events:none;animation:pop .1s ease-out forwards}
@@ -40,7 +40,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 <div class="wrap">
 
 <div id="v-lobby">
-  <h1>컬러 타일 멀티 <small class="ver">v19</small></h1>
+  <h1>컬러 타일 멀티 <small class="ver">v20</small></h1>
   <div class="card">
       <div class="row"><button class="p" id="create">방 생성</button><button id="quick">빠른 입장 (랜덤 매칭)</button></div>
     <div class="row"><input type="text" id="code" maxlength="4" placeholder="방 코드" style="width:110px;text-transform:uppercase"><button class="p" id="join">방 접속</button></div>
