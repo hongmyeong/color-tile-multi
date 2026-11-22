@@ -46,7 +46,15 @@ function leave(s) {
   if (r.host === s.id) r.host = r.players.keys().next().value;
   if (r.state === "countdown" && ![...r.players.values()].some((p) => p.st === "playing")) { clearTimeout(r.timer); r.state = "lobby"; }
   if (r.state === "playing" && ![...r.players.values()].some((p) => p.st === "playing")) { end(r); return; }
+  if (r.state === "playing") resched(r);
   send(r);
+}
+function resched(r) {
+  const ps = [...r.players.values()].filter((p) => p.st === "playing");
+  if (!ps.length) return;
+  r.endAt = Math.max(...ps.map((p) => p.endAt || 0));
+  clearTimeout(r.timer);
+  r.timer = setTimeout(() => end(r), Math.max(0, r.endAt - Date.now()));
 }
 function end(r) {
   if (r.state !== "playing") return;
@@ -131,7 +139,7 @@ io.on("connection", (s) => {
       }
       r.state = "playing";
       r.endAt = Date.now() + DUR * 1000;
-      cur.forEach((p) => { p.board = G.makeBoard(seed, r.n); });
+      cur.forEach((p) => { p.board = G.makeBoard(seed, r.n); p.endAt = r.endAt; });
       send(r);
       cur.forEach((p) => io.to(p.id).emit("start", { seed, n: r.n, mode: r.mode, ms: DUR * 1000 }));
       r.timer = setTimeout(() => end(r), DUR * 1000);
@@ -140,7 +148,7 @@ io.on("connection", (s) => {
   });
   s.on("click", ({ y, x } = {}) => {
     const r = me(s), p = r && r.players.get(s.id);
-    if (!p || r.state !== "playing" || p.st !== "playing" || Date.now() > r.endAt + 300) return;
+    if (!p || r.state !== "playing" || p.st !== "playing" || Date.now() > p.endAt + 300) return;
     if (!Number.isInteger(y) || !Number.isInteger(x) || y < 0 || y >= G.H || x < 0 || x >= G.W) return;
     const rem = G.applyClick(p.board, y, x);
     if (rem === null) return;
@@ -150,10 +158,13 @@ io.on("connection", (s) => {
   s.on("reshuffle", () => {
     const r = me(s), p = r && r.players.get(s.id);
     if (!p || r.state !== "playing" || p.st !== "playing") return;
+    if (Date.now() > p.endAt) return; // 내 시간이 끝났으면 판갈기 불가
     const seed = rnd();
     p.board = G.makeBoard(seed, r.n);
     p.score = 0;
-    s.emit("board", { seed });
+    p.endAt = Date.now() + DUR * 1000; // 시간도 초기화
+    resched(r);
+    s.emit("board", { seed, ms: DUR * 1000 });
     scores(r);
   });
   s.on("back", () => {
