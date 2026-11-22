@@ -12,6 +12,8 @@
 body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;min-height:100vh}
 .wrap{max-width:1100px;margin:0 auto;padding:16px}
 #v-lobby,#v-room,#v-result{max-width:900px;margin:0 auto}
+.cdov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:30;font-weight:800;color:#fff;font-size:min(40vw,220px)}
+#cdn{animation:cdpop .4s ease-out}@keyframes cdpop{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}
 .ver{font-size:12px;font-weight:400;color:var(--mu);margin-left:2px;vertical-align:middle}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:12px}
 h1{text-align:center;margin:8px 0 12px}
@@ -38,7 +40,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 <div class="wrap">
 
 <div id="v-lobby">
-  <h1>컬러 타일 멀티 <small class="ver">v18</small></h1>
+  <h1>컬러 타일 멀티 <small class="ver">v19</small></h1>
   <div class="card">
       <div class="row"><button class="p" id="create">방 생성</button><button id="quick">빠른 입장 (랜덤 매칭)</button></div>
     <div class="row"><input type="text" id="code" maxlength="4" placeholder="방 코드" style="width:110px;text-transform:uppercase"><button class="p" id="join">방 접속</button></div>
@@ -84,6 +86,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 </div>
 </div>
 
+<div id="cd" class="cdov hidden"><span id="cdn">3</span></div>
 <script src="/socket.io/socket.io.js"></script>
 <script src="/game.js"></script>
 <script>
@@ -102,7 +105,7 @@ let mode=1;
 const $=id=>document.getElementById(id), s=io();
 let room=null,view="lobby",board,endAt=0,tick,sc={};
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-function go(v){view=v;["lobby","room","game","result"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!==v))}
+function go(v){view=v;if(v!=="room")$("cd").classList.add("hidden");["lobby","room","game","result"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!==v))}
 let opt={shape:false,sfx:true},ac;
 try{Object.assign(opt,JSON.parse(localStorage.getItem("opt")||"{}"))}catch(e){}
 $("shape").checked=opt.shape;$("sfx").checked=opt.sfx;
@@ -129,7 +132,7 @@ $("go").onclick=()=>{$("rmsg").textContent="";s.emit("start")};
 $("back").onclick=()=>{s.emit("back");go("room")};
 $("reshuffle").onclick=()=>{if(confirm("점수와 판을 초기화합니다."))s.emit("reshuffle")};
 
-s.on("room",r=>{room=r;if(view==="lobby")go("room");renderRoom();if(view==="game")renderScores()});
+s.on("room",r=>{room=r;if(r.state==="lobby")$("cd").classList.add("hidden");if(view==="lobby")go("room");renderRoom();if(view==="game")renderScores()});
 s.on("kicked",()=>{room=null;cleanUrl();go("lobby");$("err").textContent="방에서 추방되었습니다."});
 const stLabel=p=>p.st==="playing"?"🎮 게임 중":p.st==="result"?"📋 결과 확인 중":p.id===room.host?"방장":p.ready?"✅ 준비":"대기";
 function renderRoom(){
@@ -146,8 +149,8 @@ function renderRoom(){
   if(document.activeElement!==nm)nm.value=me?me.nick:"";
   nm.disabled=$("setnick").disabled=!!(me&&(me.ready||me.st==="playing"));
   if(me&&me.ready)$("nickmsg").textContent=RM;else if($("nickmsg").textContent===RM)$("nickmsg").textContent="";
-  $("go").disabled=room.state==="playing"||(!room.force&&room.players.some(p=>p.st==="lobby"&&p.id!==room.host&&!p.ready));
-  $("gmsg").textContent=room.state==="playing"?"게임이 진행 중이에요. 끝나면 시작할 수 있어요.":"";
+  $("go").disabled=room.state!=="lobby"||(!room.force&&room.players.some(p=>p.st==="lobby"&&p.id!==room.host&&!p.ready));
+  $("gmsg").textContent=room.state!=="lobby"?"게임이 진행 중이에요. 끝나면 시작할 수 있어요.":"";
 }
 function render(gh){
   const b=$("board");b.style.gridTemplateColumns=`repeat(${Game.W},1fr)`;b.innerHTML="";
@@ -169,6 +172,9 @@ function renderScores(){
   $("scores").innerHTML=list.map(p=>`<div class="pl${p.id===s.id?" me":""}"><span>${esc(p.nick)}</span><span>${p.score}</span></div>`).join("");
   $("score").textContent="Score: "+(sc[s.id]??0);
 }
+s.on("countdown",({n})=>{
+  $("cd").classList.remove("hidden");const e=$("cdn");e.textContent=n;e.style.animation="none";void e.offsetWidth;e.style.animation="";tone(660,.12,"sine",.28);
+});
 s.on("start",({seed,n,mode:m,ms})=>{mode=m||1;
   board=Game.makeBoard(seed,n);endAt=Date.now()+ms;sc={};render();renderScores();go("game");
   clearInterval(tick);tick=setInterval(()=>{$("time").textContent="Time: "+Math.max(0,Math.ceil((endAt-Date.now())/1000))},250);
