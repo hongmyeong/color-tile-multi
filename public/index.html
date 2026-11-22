@@ -40,7 +40,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 <div class="wrap">
 
 <div id="v-lobby">
-  <h1>컬러 타일 멀티 <small class="ver">v20</small></h1>
+  <h1>컬러 타일 멀티 <small class="ver">v21</small></h1>
   <div class="card">
       <div class="row"><button class="p" id="create">방 생성</button><button id="quick">빠른 입장 (랜덤 매칭)</button></div>
     <div class="row"><input type="text" id="code" maxlength="4" placeholder="방 코드" style="width:110px;text-transform:uppercase"><button class="p" id="join">방 접속</button></div>
@@ -130,7 +130,7 @@ $("leave").onclick=$("leave2").onclick=out;
 $("ready").onclick=()=>{const p=room.players.find(p=>p.id===s.id);s.emit("ready",!p.ready)};
 $("go").onclick=()=>{$("rmsg").textContent="";s.emit("start")};
 $("back").onclick=()=>{s.emit("back");go("room")};
-$("reshuffle").onclick=()=>{if(confirm("점수와 판을 초기화합니다."))s.emit("reshuffle")};
+$("reshuffle").onclick=()=>{if(confirm("시간, 점수, 판을 모두 초기화합니다."))s.emit("reshuffle")};
 
 s.on("room",r=>{room=r;if(r.state==="lobby")$("cd").classList.add("hidden");if(view==="lobby")go("room");renderRoom();if(view==="game")renderScores()});
 s.on("kicked",()=>{room=null;cleanUrl();go("lobby");$("err").textContent="방에서 추방되었습니다."});
@@ -177,9 +177,9 @@ s.on("countdown",({n})=>{
 });
 s.on("start",({seed,n,mode:m,ms})=>{mode=m||1;
   board=Game.makeBoard(seed,n);endAt=Date.now()+ms;sc={};render();renderScores();go("game");
-  clearInterval(tick);tick=setInterval(()=>{$("time").textContent="Time: "+Math.max(0,Math.ceil((endAt-Date.now())/1000))},250);
+  clearInterval(tick);tick=setInterval(()=>{{const l=Math.max(0,Math.ceil((endAt-Date.now())/1000));$("time").textContent="Time: "+l+(l===0?" · 다른 플레이어 대기 중":"")}},250);
 });
-s.on("board",({seed})=>{board=Game.makeBoard(seed,room.n);render()});
+s.on("board",({seed,ms})=>{board=Game.makeBoard(seed,room.n);if(ms)endAt=Date.now()+ms;render()});
 s.on("scores",a=>{a.forEach(x=>sc[x.id]=x.score);if(view==="game")renderScores()});
 s.on("end",rank=>{
   clearInterval(tick);endAt=0;
