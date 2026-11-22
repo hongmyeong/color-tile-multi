@@ -9,7 +9,7 @@ const io = new Server(srv);
 app.use(express.static(__dirname + "/public"));
 
 const rooms = new Map();
-const DUR = 120, MAX = 8;
+const DUR = 120, MAX = 8, CD = 3; // 게임 시간, 최대 인원, 카운트다운(초)
 const rnd = () => Math.floor(Math.random() * 2 ** 31);
 const newCode = () => {
   let c;
@@ -44,6 +44,7 @@ function leave(s) {
   s.data.room = null;
   if (!r.players.size) { clearTimeout(r.timer); rooms.delete(r.code); return; }
   if (r.host === s.id) r.host = r.players.keys().next().value;
+  if (r.state === "countdown" && ![...r.players.values()].some((p) => p.st === "playing")) { clearTimeout(r.timer); r.state = "lobby"; }
   if (r.state === "playing" && ![...r.players.values()].some((p) => p.st === "playing")) { end(r); return; }
   send(r);
 }
@@ -116,13 +117,26 @@ io.on("connection", (s) => {
     // 대기실에 있는 사람만 참가 (결과 확인 중인 사람은 제외)
     const ps = [...r.players.values()].filter((p) => p.st === "lobby");
     if (!r.force && ps.some((p) => p.id !== r.host && !p.ready)) return;
-    r.state = "playing";
-    r.endAt = Date.now() + DUR * 1000;
+    r.state = "countdown";
+    ps.forEach((p) => { p.score = 0; p.st = "playing"; });
     const seed = rnd();
-    ps.forEach((p) => { p.score = 0; p.board = G.makeBoard(seed, r.n); p.st = "playing"; });
     send(r);
-    ps.forEach((p) => io.to(p.id).emit("start", { seed, n: r.n, mode: r.mode, ms: DUR * 1000 }));
-    r.timer = setTimeout(() => end(r), DUR * 1000);
+    const cd = (n) => {
+      if (r.state !== "countdown") return;
+      const cur = [...r.players.values()].filter((p) => p.st === "playing");
+      if (n > 0) {
+        cur.forEach((p) => io.to(p.id).emit("countdown", { n }));
+        r.timer = setTimeout(() => cd(n - 1), 1000);
+        return;
+      }
+      r.state = "playing";
+      r.endAt = Date.now() + DUR * 1000;
+      cur.forEach((p) => { p.board = G.makeBoard(seed, r.n); });
+      send(r);
+      cur.forEach((p) => io.to(p.id).emit("start", { seed, n: r.n, mode: r.mode, ms: DUR * 1000 }));
+      r.timer = setTimeout(() => end(r), DUR * 1000);
+    };
+    cd(CD);
   });
   s.on("click", ({ y, x } = {}) => {
     const r = me(s), p = r && r.players.get(s.id);
