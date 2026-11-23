@@ -10,6 +10,7 @@ app.use(express.static(__dirname + "/public"));
 
 const rooms = new Map();
 const DUR = 120, MAX = 8, CD = 3; // 게임 시간, 최대 인원, 카운트다운(초)
+const TEST = process.env.TEST_MODE === "1"; // 테스트 모드: 켜져 있을 때만 치트(F9)를 허용 (평소엔 꺼 둘 것)
 const rnd = () => Math.floor(Math.random() * 2 ** 31);
 const newCode = () => {
   let c;
@@ -17,7 +18,7 @@ const newCode = () => {
   return c;
 };
 const pub = (r) => ({
-  code: r.code, host: r.host, state: r.state, n: r.n, mode: r.mode, force: r.force,
+  code: r.code, host: r.host, state: r.state, n: r.n, mode: r.mode, force: r.force, test: TEST,
   players: [...r.players.values()].map((p) => ({ id: p.id, nick: p.nick, ready: p.ready, st: p.st, score: p.score })),
 });
 const send = (r) => io.to(r.code).emit("room", pub(r));
@@ -167,6 +168,13 @@ io.on("connection", (s) => {
     s.emit("board", { seed, ms: DUR * 1000 });
     scores(r);
   });
+  s.on("cheat", () => {
+    if (!TEST) return;
+    const r = me(s), p = r && r.players.get(s.id);
+    if (!p || r.state !== "playing" || p.st !== "playing" || Date.now() > p.endAt + 300) return;
+    p.score = 200;
+    scores(r);
+  });
   s.on("back", () => {
     const r = me(s), p = r && r.players.get(s.id);
     if (p && p.st === "result") { p.st = "lobby"; p.ready = false; send(r); }
@@ -176,4 +184,4 @@ io.on("connection", (s) => {
 });
 
 const PORT = process.env.PORT || 3000;
-srv.listen(PORT, () => console.log("http://localhost:" + PORT));
+srv.listen(PORT, () => { console.log("http://localhost:" + PORT); if (TEST) console.log("!! TEST_MODE 켜짐: 치트 허용 중"); });
