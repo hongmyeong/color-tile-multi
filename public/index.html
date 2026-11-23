@@ -38,9 +38,10 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 </head>
 <body>
 <div class="wrap">
+<div id="testbadge" class="hidden" style="text-align:center;margin-bottom:8px"><span style="background:#7a1f1f;color:#fff;border-radius:999px;padding:3px 12px;font-size:12px">🧪 테스트 모드 · 게임 중 F9 = 200점</span></div>
 
 <div id="v-lobby">
-  <h1>컬러 타일 멀티 <small class="ver">v21</small></h1>
+  <h1>컬러 타일 멀티 <small class="ver">v24</small></h1>
   <div class="card">
       <div class="row"><button class="p" id="create">방 생성</button><button id="quick">빠른 입장 (랜덤 매칭)</button></div>
     <div class="row"><input type="text" id="code" maxlength="4" placeholder="방 코드" style="width:110px;text-transform:uppercase"><button class="p" id="join">방 접속</button></div>
@@ -101,14 +102,36 @@ const hx=a=>"#"+a.map(v=>Math.round(v).toString(16).padStart(2,"0")).join("");
 const LIGHT=.35,SHADE=.5; // 빛(왼쪽 위)·그림자(오른쪽 아래) 강도: 0이면 효과 없음
 const grad=h=>{const c=ch(h),lit=hx(c.map(v=>v+(255-v)*LIGHT)),sh=hx(c.map(v=>v+(v*v/255-v)*SHADE));return `linear-gradient(135deg,${lit} 0%,${h} 58%,${sh} 90%,${sh} 100%)`};
 const GR={};for(const m in PALS)GR[m]=PALS[m].map(grad);
-let mode=1;
+let mode=1,miss=0,perfect=false; // miss: 연속으로 틀린 횟수, perfect: 만점(200점) 효과 재생 여부
 const $=id=>document.getElementById(id), s=io();
 let room=null,view="lobby",board,endAt=0,tick,sc={};
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-function go(v){view=v;if(v!=="room")$("cd").classList.add("hidden");["lobby","room","game","result"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!==v))}
+function go(v){view=v;$("testbadge").classList.toggle("hidden",!(room&&room.test));if(v!=="room")$("cd").classList.add("hidden");["lobby","room","game","result"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!==v))}
 let opt={shape:false,sfx:true},ac;
 try{Object.assign(opt,JSON.parse(localStorage.getItem("opt")||"{}"))}catch(e){}
 $("shape").checked=opt.shape;$("sfx").checked=opt.sfx;
+const AC=()=>{ac=ac||new(window.AudioContext||window.webkitAudioContext)();if(ac.state==="suspended")ac.resume();return ac};
+// 사람 목소리 느낌의 소리: 톱니파 + 모음 포먼트 필터 (군중 소리를 흉내 냄)
+function voice(t,f0,f1,dur,fm,vol){const c=AC(),o=c.createOscillator(),g=c.createGain(),l=c.createOscillator(),lg=c.createGain();
+  o.type="sawtooth";o.frequency.setValueAtTime(f0,t);o.frequency.linearRampToValueAtTime(f1,t+dur);
+  l.frequency.value=4.5+Math.random()*2.5;lg.gain.value=f0*.025;l.connect(lg);lg.connect(o.frequency);
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(vol,t+dur*.3);g.gain.linearRampToValueAtTime(vol*.8,t+dur*.7);g.gain.linearRampToValueAtTime(.0001,t+dur);
+  fm.forEach(([f,q,k])=>{const b=c.createBiquadFilter(),m=c.createGain();b.type="bandpass";b.frequency.value=f;b.Q.value=q;m.gain.value=k;o.connect(b);b.connect(m);m.connect(g)});
+  g.connect(c.destination);o.start(t);l.start(t);o.stop(t+dur+.05);l.stop(t+dur+.05)}
+// 야유(부우~): 낮은 "우" 소리를 여러 명이 내며 음이 아래로 처짐
+function boo(){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime;
+  for(let i=0;i<7;i++){const f=100+Math.random()*60,d=1.3+Math.random()*.5;voice(t+Math.random()*.3,f,f*.78,d,[[300,6,1.3],[850,8,.7]],.28)}}catch(e){}}
+// 만점 축하: 박수 소리 + 환호성
+function cheer(){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,len=3.4;
+  const nb=c.createBuffer(1,c.sampleRate,c.sampleRate),d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+  const src=c.createBufferSource();src.buffer=nb;src.loop=true;
+  const hp=c.createBiquadFilter();hp.type="highpass";hp.frequency.value=1200;
+  const bp=c.createBiquadFilter();bp.type="bandpass";bp.frequency.value=2800;bp.Q.value=.7;
+  const cl=c.createGain(),env=c.createGain();cl.gain.setValueAtTime(0,t);
+  for(let x=0;x<len-.2;x+=.012+Math.random()*.03){cl.gain.setValueAtTime(.25+Math.random()*.6,t+x);cl.gain.linearRampToValueAtTime(.02,t+x+.01)}
+  env.gain.setValueAtTime(.0001,t);env.gain.linearRampToValueAtTime(.8,t+.5);env.gain.setValueAtTime(.8,t+len-1.2);env.gain.linearRampToValueAtTime(.0001,t+len);
+  src.connect(hp);hp.connect(bp);bp.connect(cl);cl.connect(env);env.connect(c.destination);src.start(t);src.stop(t+len);
+  for(let i=0;i<9;i++){const f=190+Math.random()*160,d=1+Math.random()*.7;voice(t+.1+Math.random()*1.4,f,f*1.3,d,[[700,7,1],[1150,8,.7]],.12)}}catch(e){}}
 function tone(f,d,type,v){if(!opt.sfx)return;try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();if(ac.state==="suspended")ac.resume();const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime;o.type=type;o.frequency.value=f;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+d)}catch(e){}}
 $("shape").onchange=$("sfx").onchange=()=>{opt.shape=$("shape").checked;opt.sfx=$("sfx").checked;try{localStorage.setItem("opt",JSON.stringify(opt))}catch(e){};tone(660,.08,"sine",.15)};
 const nick=()=>{try{return localStorage.getItem("nick")||""}catch(e){return ""}};
@@ -124,6 +147,7 @@ $("force").onchange=$("cmode").onchange=()=>s.emit("settings",{force:$("force").
 function sendNick(){const v=$("mynick").value.trim();if(!v){$("nickmsg").textContent="닉네임을 입력해 주세요.";return}
   s.emit("nick",v,r=>{$("nickmsg").textContent=r&&r.ok?"변경했어요.":(r&&r.msg)||"변경할 수 없어요.";if(r&&r.ok)try{localStorage.setItem("nick",v)}catch(e){}})}
 $("setnick").onclick=sendNick;$("mynick").onkeydown=e=>{if(e.key==="Enter")sendNick()};
+document.addEventListener("keydown",e=>{if(e.key==="F9"&&view==="game"&&room&&room.test){e.preventDefault();s.emit("cheat")}});
 $("copy").onclick=()=>{const u=location.origin+"/?room="+room.code;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>$("rmsg").textContent="링크를 복사했습니다.").catch(()=>$("rmsg").textContent=u)};
 const out=()=>{s.emit("leave");room=null;cleanUrl();go("lobby")};
 $("leave").onclick=$("leave2").onclick=out;
@@ -164,7 +188,7 @@ function click(y,x){
   if(Date.now()>endAt)return;
   const snap=board.map(r=>r.slice()),rem=Game.applyClick(board,y,x);if(rem===null)return;
   s.emit("click",{y,x});
-  if(!rem.length)tone(140,.15,"square",.28);else tone(520+Math.min(rem.length,4)*100,.09,"sine",.28);
+  if(!rem.length){miss++;if(miss>=5){miss=0;boo()}else tone(140,.15,"square",.28)}else{miss=0;tone(520+Math.min(rem.length,4)*100,.09,"sine",.28)}
   render(rem.map(([j,i])=>[j,i,snap[j][i]]));
 }
 function renderScores(){
@@ -175,12 +199,12 @@ function renderScores(){
 s.on("countdown",({n})=>{
   $("cd").classList.remove("hidden");const e=$("cdn");e.textContent=n;e.style.animation="none";void e.offsetWidth;e.style.animation="";tone(660,.12,"sine",.28);
 });
-s.on("start",({seed,n,mode:m,ms})=>{mode=m||1;
+s.on("start",({seed,n,mode:m,ms})=>{mode=m||1;miss=0;perfect=false;
   board=Game.makeBoard(seed,n);endAt=Date.now()+ms;sc={};render();renderScores();go("game");
   clearInterval(tick);tick=setInterval(()=>{{const l=Math.max(0,Math.ceil((endAt-Date.now())/1000));$("time").textContent="Time: "+l+(l===0?" · 다른 플레이어 대기 중":"")}},250);
 });
-s.on("board",({seed,ms})=>{board=Game.makeBoard(seed,room.n);if(ms)endAt=Date.now()+ms;render()});
-s.on("scores",a=>{a.forEach(x=>sc[x.id]=x.score);if(view==="game")renderScores()});
+s.on("board",({seed,ms})=>{miss=0;perfect=false;board=Game.makeBoard(seed,room.n);if(ms)endAt=Date.now()+ms;render()});
+s.on("scores",a=>{a.forEach(x=>{sc[x.id]=x.score;if(x.id===s.id&&x.score>=200&&!perfect){perfect=true;cheer()}});if(view==="game")renderScores()});
 s.on("end",rank=>{
   clearInterval(tick);endAt=0;
   $("rank").innerHTML=rank.map((p,i)=>`<div class="pl${p.id===s.id?" me":""}"><span>${i+1}위 ${esc(p.nick)}</span><span>${p.score}점</span></div>`).join("");
