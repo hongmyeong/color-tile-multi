@@ -10,6 +10,7 @@ app.use(express.static(__dirname + "/public"));
 
 const rooms = new Map();
 const DUR = 120, MAX = 8, CD = 3; // 게임 시간, 최대 인원, 카운트다운(초)
+const SURV = ["snow", "quake", "fog", "night", "thunder", "rain"]; // 서바이벌 방해 이벤트 종류
 const TEST = process.env.TEST_MODE === "1"; // 테스트 모드: 켜져 있을 때만 치트(F9)를 허용 (평소엔 꺼 둘 것)
 const rnd = () => Math.floor(Math.random() * 2 ** 31);
 const newCode = () => {
@@ -18,15 +19,15 @@ const newCode = () => {
   return c;
 };
 const pub = (r) => ({
-  code: r.code, host: r.host, state: r.state, n: r.n, mode: r.mode, force: r.force, test: TEST,
+  code: r.code, host: r.host, state: r.state, n: r.n, mode: r.mode, gmode: r.gmode, force: r.force, test: TEST,
   players: [...r.players.values()].map((p) => ({ id: p.id, nick: p.nick, ready: p.ready, st: p.st, score: p.score })),
 });
 const send = (r) => io.to(r.code).emit("room", pub(r));
 const me = (s) => rooms.get(s.data.room);
-const scores = (r) => io.to(r.code).emit("scores", [...r.players.values()].map((q) => ({ id: q.id, score: q.score })));
+const scores = (r) => io.to(r.code).emit("scores", [...r.players.values()].map((q) => ({ id: q.id, score: q.score, combo: q.combo || 0, max: q.max || 0 })));
 
 function makeRoom(quick) {
-  const r = { code: newCode(), host: null, state: "lobby", n: 12, mode: 1, force: false, quick, players: new Map(), timer: null, endAt: 0 };
+  const r = { code: newCode(), host: null, state: "lobby", n: 12, mode: 1, gmode: "normal", events: [], force: false, quick, players: new Map(), timer: null, endAt: 0 };
   rooms.set(r.code, r);
   return r;
 }
@@ -62,7 +63,7 @@ function end(r) {
   clearTimeout(r.timer);
   r.state = "lobby";
   const ps = [...r.players.values()].filter((p) => p.st === "playing");
-  const ranking = ps.map((p) => ({ id: p.id, nick: p.nick, score: p.score })).sort((a, b) => b.score - a.score);
+  const ranking = ps.map((p) => ({ id: p.id, nick: p.nick, score: p.score, combo: p.max || 0 })).sort(r.gmode === "combo" ? (a, b) => b.combo - a.combo || b.score - a.score : (a, b) => b.score - a.score);
   ps.forEach((p) => { p.ready = false; p.st = "result"; io.to(p.id).emit("end", ranking); });
   send(r);
 }
@@ -105,10 +106,11 @@ io.on("connection", (s) => {
     const r = me(s), p = r && r.players.get(s.id);
     if (p && p.st === "lobby") { p.ready = !!v; send(r); }
   });
-  s.on("settings", ({ force, mode } = {}) => {
+  s.on("settings", ({ force, mode, gmode } = {}) => {
     const r = me(s);
     if (!r || r.host !== s.id || r.state !== "lobby") return;
     if (mode === 1 || mode === 2) r.mode = mode;
+    if (["normal", "survival", "combo"].includes(gmode)) r.gmode = gmode;
     r.force = !!force;
     send(r);
   });
@@ -140,9 +142,11 @@ io.on("connection", (s) => {
       }
       r.state = "playing";
       r.endAt = Date.now() + DUR * 1000;
-      cur.forEach((p) => { p.board = G.makeBoard(seed, r.n); p.endAt = r.endAt; });
+      // 서바이벌: 시작 후 30·60·90초(남은 시간 90·60·30초)에 이벤트 1개씩. 모두 같은 이벤트를 받음
+      r.events = r.gmode === "survival" ? [30000, 60000, 90000].map((at) => { const ty = SURV[Math.floor(Math.random() * SURV.length)]; return { at, t: ty, d: ty === "night" ? 5000 : 3000 + Math.floor(Math.random() * 2001) }; }) : [];
+      cur.forEach((p) => { p.board = G.makeBoard(seed, r.n); p.endAt = r.endAt; p.combo = 0; p.max = 0; });
       send(r);
-      cur.forEach((p) => io.to(p.id).emit("start", { seed, n: r.n, mode: r.mode, ms: DUR * 1000 }));
+      cur.forEach((p) => io.to(p.id).emit("start", { seed, n: r.n, mode: r.mode, ms: DUR * 1000, events: r.events }));
       r.timer = setTimeout(() => end(r), DUR * 1000);
     };
     cd(CD);
@@ -153,6 +157,7 @@ io.on("connection", (s) => {
     if (!Number.isInteger(y) || !Number.isInteger(x) || y < 0 || y >= G.H || x < 0 || x >= G.W) return;
     const rem = G.applyClick(p.board, y, x);
     if (rem === null) return;
+    if (rem.length) { p.combo = (p.combo || 0) + 1; p.max = Math.max(p.max || 0, p.combo); } else p.combo = 0;
     p.score = rem.length ? p.score + rem.length : Math.max(0, p.score - 1);
     scores(r);
   });
@@ -163,9 +168,11 @@ io.on("connection", (s) => {
     const seed = rnd();
     p.board = G.makeBoard(seed, r.n);
     p.score = 0;
+    p.combo = 0;
+    p.max = 0;
     p.endAt = Date.now() + DUR * 1000; // 시간도 초기화
     resched(r);
-    s.emit("board", { seed, ms: DUR * 1000 });
+    s.emit("board", { seed, ms: DUR * 1000, events: r.events });
     scores(r);
   });
   s.on("cheat", () => {
