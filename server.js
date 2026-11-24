@@ -11,6 +11,7 @@ app.use(express.static(__dirname + "/public"));
 const rooms = new Map();
 const DUR = 120, MAX = 8, CD = 3; // 게임 시간, 최대 인원, 카운트다운(초)
 const SURV = ["snow", "quake", "fog", "night", "thunder", "rain"]; // 서바이벌 방해 이벤트 종류
+const EVENT_MS = 6000; // 방해 이벤트 지속 시간(ms)
 const TEST = process.env.TEST_MODE === "1"; // 테스트 모드: 켜져 있을 때만 치트(F9)를 허용 (평소엔 꺼 둘 것)
 const rnd = () => Math.floor(Math.random() * 2 ** 31);
 const newCode = () => {
@@ -143,7 +144,7 @@ io.on("connection", (s) => {
       r.state = "playing";
       r.endAt = Date.now() + DUR * 1000;
       // 서바이벌: 시작 후 30·60·90초(남은 시간 90·60·30초)에 이벤트 1개씩. 모두 같은 이벤트를 받음
-      r.events = r.gmode === "survival" ? [30000, 60000, 90000].map((at) => { const ty = SURV[Math.floor(Math.random() * SURV.length)]; return { at, t: ty, d: ty === "night" ? 5000 : 3000 + Math.floor(Math.random() * 2001) }; }) : [];
+      r.events = r.gmode === "survival" ? [30000, 60000, 90000].map((at) => { const ty = SURV[Math.floor(Math.random() * SURV.length)]; return { at, t: ty, d: EVENT_MS }; }) : [];
       cur.forEach((p) => { p.board = G.makeBoard(seed, r.n); p.endAt = r.endAt; p.combo = 0; p.max = 0; });
       send(r);
       cur.forEach((p) => io.to(p.id).emit("start", { seed, n: r.n, mode: r.mode, ms: DUR * 1000, events: r.events }));
