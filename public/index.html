@@ -14,6 +14,12 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-
 #v-lobby,#v-room,#v-result{max-width:900px;margin:0 auto}
 .cdov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:30;font-weight:800;color:#fff;font-size:min(40vw,220px)}
 #cdn{animation:cdpop .4s ease-out}@keyframes cdpop{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}
+#fog{position:fixed;inset:0;z-index:24;pointer-events:none;overflow:hidden}
+.fogb{position:absolute;left:0;top:0;border-radius:50%;background:radial-gradient(circle,rgba(228,234,246,.85) 0%,rgba(228,234,246,.5) 40%,rgba(228,234,246,0) 72%);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);-webkit-mask-image:radial-gradient(circle,#000 30%,transparent 72%);mask-image:radial-gradient(circle,#000 30%,transparent 72%);will-change:transform,opacity}
+#nite{position:fixed;inset:0;z-index:26;pointer-events:none;background:radial-gradient(circle 120px at var(--mx,50%) var(--my,50%),rgba(0,0,0,0) 0,rgba(0,0,0,.94) 100%);animation:fin .4s}
+#flash{position:fixed;inset:0;z-index:27;pointer-events:none;background:#fff;animation:fl .5s ease-out forwards}
+@keyframes fin{from{opacity:0}to{opacity:1}}@keyframes fl{0%{opacity:var(--a,.7)}100%{opacity:0}}
+.quake{animation:qk .09s linear infinite}@keyframes qk{0%{transform:translateX(-5px)}50%{transform:translateX(5px)}100%{transform:translateX(-5px)}}
 .ver{font-size:12px;font-weight:400;color:var(--mu);margin-left:2px;vertical-align:middle}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:12px}
 h1{text-align:center;margin:8px 0 12px}
@@ -41,7 +47,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 <div id="testbadge" class="hidden" style="text-align:center;margin-bottom:8px"><span style="background:#7a1f1f;color:#fff;border-radius:999px;padding:3px 12px;font-size:12px">🧪 테스트 모드 · 게임 중 F9 = 200점</span></div>
 
 <div id="v-lobby">
-  <h1>컬러 타일 멀티 <small class="ver">v24</small></h1>
+  <h1>컬러 타일 멀티 <small class="ver">v26</small></h1>
   <div class="card">
       <div class="row"><button class="p" id="create">방 생성</button><button id="quick">빠른 입장 (랜덤 매칭)</button></div>
     <div class="row"><input type="text" id="code" maxlength="4" placeholder="방 코드" style="width:110px;text-transform:uppercase"><button class="p" id="join">방 접속</button></div>
@@ -62,6 +68,8 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
   <div class="card" id="settings">
     <b>⚙️ 방 설정</b>
     <div class="row"><label>색상 모드 <select id="cmode"><option value="1">모드 1</option><option value="2">모드 2</option></select></label></div>
+    <div class="row"><label>게임 모드 <select id="gmode"><option value="normal">일반</option><option value="survival">서바이벌</option><option value="combo">콤보</option></select></label></div>
+    <div class="mu" id="gdesc"></div>
     <div class="row" id="swatch"></div>
     <div class="row"><label><input type="checkbox" id="force"> 강제 시작 (준비 무시)</label></div>
     <div class="mu" id="hostonly">방장만 변경할 수 있습니다.</div>
@@ -74,7 +82,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 </div>
 
 <div id="v-game" class="hidden">
-  <div class="top"><span id="time">Time: 120</span><span id="score">Score: 0</span></div>
+  <div class="top"><span id="time">Time: 120</span><span id="combo" class="hidden"></span><span id="score">Score: 0</span></div>
   <div class="row"><button id="reshuffle">🔄 판갈기</button></div>
   <div class="game"><div id="boardBox"><div id="board"></div></div>
   <div id="side" class="card"><b>점수판</b><div id="scores"></div></div></div>
@@ -87,6 +95,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 </div>
 </div>
 
+<canvas id="fx" class="hidden" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:25"></canvas><div id="fog" class="hidden"></div><div id="nite" class="hidden"></div><div id="flash" class="hidden"></div>
 <div id="cd" class="cdov hidden"><span id="cdn">3</span></div>
 <script src="/socket.io/socket.io.js"></script>
 <script src="/game.js"></script>
@@ -102,11 +111,11 @@ const hx=a=>"#"+a.map(v=>Math.round(v).toString(16).padStart(2,"0")).join("");
 const LIGHT=.35,SHADE=.5; // 빛(왼쪽 위)·그림자(오른쪽 아래) 강도: 0이면 효과 없음
 const grad=h=>{const c=ch(h),lit=hx(c.map(v=>v+(255-v)*LIGHT)),sh=hx(c.map(v=>v+(v*v/255-v)*SHADE));return `linear-gradient(135deg,${lit} 0%,${h} 58%,${sh} 90%,${sh} 100%)`};
 const GR={};for(const m in PALS)GR[m]=PALS[m].map(grad);
-let mode=1,miss=0,perfect=false; // miss: 연속으로 틀린 횟수, perfect: 만점(200점) 효과 재생 여부
+let mode=1,miss=0,perfect=false,cbm={},evs=[]; // miss: 연속으로 틀린 횟수, perfect: 만점(200점) 효과 재생 여부
 const $=id=>document.getElementById(id), s=io();
 let room=null,view="lobby",board,endAt=0,tick,sc={};
 const esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-function go(v){view=v;$("testbadge").classList.toggle("hidden",!(room&&room.test));if(v!=="room")$("cd").classList.add("hidden");["lobby","room","game","result"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!==v))}
+function go(v){view=v;if(v!=="game")stopFx();$("testbadge").classList.toggle("hidden",!(room&&room.test));if(v!=="room")$("cd").classList.add("hidden");["lobby","room","game","result"].forEach(x=>$("v-"+x).classList.toggle("hidden",x!==v))}
 let opt={shape:false,sfx:true},ac;
 try{Object.assign(opt,JSON.parse(localStorage.getItem("opt")||"{}"))}catch(e){}
 $("shape").checked=opt.shape;$("sfx").checked=opt.sfx;
@@ -143,7 +152,7 @@ const q=(new URLSearchParams(location.search).get("room")||"").toUpperCase().rep
 const cleanUrl=()=>{try{history.replaceState(null,"",location.pathname)}catch(e){}};
 // 초대 링크(/?room=코드)로 열면 바로 그 방에 접속
 if(q){$("code").value=q;$("err").textContent="방에 접속하는 중...";s.emit("joinRoom",{code:q,nick:nick()},res)}
-$("force").onchange=$("cmode").onchange=()=>s.emit("settings",{force:$("force").checked,mode:+$("cmode").value});
+$("force").onchange=$("cmode").onchange=$("gmode").onchange=()=>s.emit("settings",{force:$("force").checked,mode:+$("cmode").value,gmode:$("gmode").value});
 function sendNick(){const v=$("mynick").value.trim();if(!v){$("nickmsg").textContent="닉네임을 입력해 주세요.";return}
   s.emit("nick",v,r=>{$("nickmsg").textContent=r&&r.ok?"변경했어요.":(r&&r.msg)||"변경할 수 없어요.";if(r&&r.ok)try{localStorage.setItem("nick",v)}catch(e){}})}
 $("setnick").onclick=sendNick;$("mynick").onkeydown=e=>{if(e.key==="Enter")sendNick()};
@@ -163,7 +172,7 @@ function renderRoom(){
   const host=room.host===s.id,me=room.players.find(p=>p.id===s.id);
   $("rcode").textContent=room.code;
   $("force").checked=room.force;
-  $("force").disabled=$("cmode").disabled=!host;$("cmode").value=room.mode;
+  $("force").disabled=$("cmode").disabled=$("gmode").disabled=!host;$("cmode").value=room.mode;$("gmode").value=room.gmode||"normal";$("gdesc").textContent=GDESC[room.gmode||"normal"];
   $("swatch").innerHTML=PALS[room.mode].map((h,i)=>`<span style="display:inline-block;width:20px;height:20px;border-radius:4px;background:${GR[room.mode][i]}"></span>`).join("");$("hostonly").classList.toggle("hidden",host);
   $("plist").innerHTML=room.players.map(p=>`<div class="pl${p.id===s.id?" me":""}"><span>${p.id===room.host?"👑 ":""}${esc(p.nick)}${p.id===s.id?" (나)":""}</span><span>${stLabel(p)}${host&&p.id!==s.id?` <button data-k="${p.id}">추방</button>`:""}</span></div>`).join("");
   $("plist").querySelectorAll("[data-k]").forEach(b=>b.onclick=()=>s.emit("kick",b.dataset.k));
@@ -188,26 +197,79 @@ function click(y,x){
   if(Date.now()>endAt)return;
   const snap=board.map(r=>r.slice()),rem=Game.applyClick(board,y,x);if(rem===null)return;
   s.emit("click",{y,x});
-  if(!rem.length){miss++;if(miss>=5){miss=0;boo()}else tone(140,.15,"square",.28)}else{miss=0;tone(520+Math.min(rem.length,4)*100,.09,"sine",.28)}
+  if(!rem.length){miss++;if(miss>=3){miss=0;boo()}else tone(140,.15,"square",.28)}else{miss=0;tone(520+Math.min(rem.length,4)*100,.09,"sine",.28)}
   render(rem.map(([j,i])=>[j,i,snap[j][i]]));
 }
 function renderScores(){
-  const list=room.players.filter(p=>p.st==="playing").map(p=>({...p,score:sc[p.id]??p.score})).sort((a,b)=>b.score-a.score);
-  $("scores").innerHTML=list.map(p=>`<div class="pl${p.id===s.id?" me":""}"><span>${esc(p.nick)}</span><span>${p.score}</span></div>`).join("");
+  const gm=room.gmode,cm=p=>cbm[p.id]||{c:0,m:0};
+  const list=room.players.filter(p=>p.st==="playing").map(p=>({...p,score:sc[p.id]??p.score})).sort((a,b)=>gm==="combo"?(cm(b).m-cm(a).m||b.score-a.score):b.score-a.score);
+  $("scores").innerHTML=list.map(p=>`<div class="pl${p.id===s.id?" me":""}"><span>${esc(p.nick)}${gm==="combo"?` <small>🔥${cm(p).c} (최고 ${cm(p).m})</small>`:""}</span><span>${p.score}</span></div>`).join("");
   $("score").textContent="Score: "+(sc[s.id]??0);
+  if(gm==="combo"){const c=cm({id:s.id});$("combo").textContent=`🔥 콤보 ${c.c} (최고 ${c.m})`}
 }
 s.on("countdown",({n})=>{
   $("cd").classList.remove("hidden");const e=$("cdn");e.textContent=n;e.style.animation="none";void e.offsetWidth;e.style.animation="";tone(660,.12,"sine",.28);
 });
-s.on("start",({seed,n,mode:m,ms})=>{mode=m||1;miss=0;perfect=false;
-  board=Game.makeBoard(seed,n);endAt=Date.now()+ms;sc={};render();renderScores();go("game");
+const GDESC={normal:"점수가 높은 순으로 순위를 매겨요.",survival:"게임 중 90·60·30초가 남았을 때 방해 이벤트가 한 번씩 발생해요. (폭설·지진·안개·밤·천둥번개·폭우)",combo:"한 판에서 연속으로 깬 콤보가 가장 높은 순으로 순위를 매겨요. 틀리면 콤보가 초기화돼요."};
+// ---------- 서바이벌 방해 이벤트 ----------
+const fxc=$("fx"),fctx=fxc.getContext("2d");let fxRaf=0,evT=[],mx=innerWidth/2,my=innerHeight/2;
+const moveNite=(x,y)=>{mx=x;my=y;const n=$("nite");n.style.setProperty("--mx",x+"px");n.style.setProperty("--my",y+"px")};
+addEventListener("mousemove",e=>moveNite(e.clientX,e.clientY));
+addEventListener("touchstart",e=>moveNite(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
+addEventListener("touchmove",e=>moveNite(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
+function stopFx(){evT.forEach(clearTimeout);evT=[];cancelAnimationFrame(fxRaf);fctx.clearRect(0,0,fxc.width,fxc.height);$("fog").innerHTML="";["fx","fog","nite","flash"].forEach(i=>$(i).classList.add("hidden"));$("fog").innerHTML="";$("board").classList.remove("quake")}
+function sched(){evT.forEach(clearTimeout);evT=evs.map(e=>setTimeout(()=>runEvent(e.t,e.d),e.at))}
+function precip(kind,d){fxc.width=innerWidth;fxc.height=innerHeight;fxc.classList.remove("hidden");
+  const snow=kind==="snow",P=[];for(let i=0;i<(snow?260:320);i++)P.push({x:Math.random()*fxc.width,y:Math.random()*fxc.height,r:1+Math.random()*3,v:snow?4+Math.random()*5:20+Math.random()*10,w:snow?3+Math.random()*4:4});
+  const t0=performance.now(),end=t0+d;cancelAnimationFrame(fxRaf);
+  const step=t=>{fctx.clearRect(0,0,fxc.width,fxc.height);fctx.globalAlpha=Math.max(0,Math.min(1,(t-t0)/300,(end-t)/400));
+    P.forEach(p=>{p.x+=p.w;p.y+=p.v;if(p.y>fxc.height){p.y=-10;p.x=Math.random()*fxc.width}if(p.x>fxc.width)p.x=0;
+      if(snow){fctx.fillStyle="rgba(255,255,255,.8)";fctx.beginPath();fctx.arc(p.x,p.y,p.r,0,7);fctx.fill()}
+      else{fctx.strokeStyle="rgba(170,200,255,.6)";fctx.lineWidth=1.3;fctx.beginPath();fctx.moveTo(p.x,p.y);fctx.lineTo(p.x-p.w*1.2,p.y-p.v*1.2);fctx.stroke()}});
+    if(t<end)fxRaf=requestAnimationFrame(step);else{fctx.clearRect(0,0,fxc.width,fxc.height);fxc.classList.add("hidden")}};
+  fxRaf=requestAnimationFrame(step)}
+const flash=()=>{const f=$("flash");f.style.setProperty("--a",.45+Math.random()*.3);f.classList.remove("hidden");f.style.animation="none";void f.offsetWidth;f.style.animation="";setTimeout(()=>f.classList.add("hidden"),520)};
+function runEvent(t,d){
+  if(t==="snow"){precip("snow",d);wind(d)}
+  else if(t==="rain"){precip("rain",d);rainSnd(d)}
+  else if(t==="quake"){const b=$("board");b.classList.add("quake");quakeSnd(d);setTimeout(()=>b.classList.remove("quake"),d)}
+  else if(t==="fog"){const f=$("fog"),b=$("board").getBoundingClientRect(),W=innerWidth;f.innerHTML="";f.classList.remove("hidden");
+    for(let i=0;i<7;i++){const z=320+Math.random()*280,e=document.createElement("div"),dir=Math.random()<.5?-1:1,x0=dir>0?-z*.6+Math.random()*W*.35:W*.65+Math.random()*W*.35-z*.4,y=b.top+Math.random()*b.height-z*.35;
+      e.className="fogb";e.style.cssText=`width:${z}px;height:${z*.75}px`;f.appendChild(e);
+      e.animate([{transform:`translate(${x0}px,${y}px)`,opacity:0},{opacity:1,offset:.25},{opacity:1,offset:.75},{transform:`translate(${x0+dir*(W*.4+Math.random()*W*.25)}px,${y+(Math.random()-.5)*80}px)`,opacity:0}],{duration:d+1200,easing:"linear",fill:"forwards"})}
+    setTimeout(()=>{f.classList.add("hidden");f.innerHTML=""},d+1300)}
+  else if(t==="night"){moveNite(mx,my);$("nite").classList.remove("hidden");setTimeout(()=>$("nite").classList.add("hidden"),d)}
+  else if(t==="thunder"){const n=Math.min(3+Math.floor(Math.random()*3),Math.floor((d-600)/800)+1);
+    for(let i=0;i<n;i++){const a=300+(n>1?i*(d-900)/(n-1):0)+(i&&i<n-1?(Math.random()-.5)*200:0);
+      setTimeout(()=>{const f=$("flash");f.classList.remove("hidden");f.style.animation="none";void f.offsetWidth;f.style.animation="";setTimeout(()=>f.classList.add("hidden"),520);thunderSnd(i===n-1?2.8:1.2+Math.random()*1.2,i===n-1?3.5:2.2+Math.random()*1.3)},a)}}}
+const nz=(c,sec)=>{const b=c.createBuffer(1,Math.ceil(c.sampleRate*sec),c.sampleRate),a=b.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=Math.random()*2-1;const n=c.createBufferSource();n.buffer=b;return n};
+const sfxOut=c=>{const k=c.createDynamicsCompressor();k.connect(c.destination);return k};
+function wind(d){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,e=d/1000,n=nz(c,e),f=c.createBiquadFilter(),g=c.createGain(),l=c.createOscillator(),lg=c.createGain();
+  f.type="bandpass";f.Q.value=1.2;f.frequency.value=550;l.frequency.value=.8;lg.gain.value=280;l.connect(lg);lg.connect(f.frequency);
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(1.4,t+.7);g.gain.setValueAtTime(1.4,t+e-.7);g.gain.linearRampToValueAtTime(.0001,t+e);
+  n.connect(f);f.connect(g);g.connect(sfxOut(c));n.start(t);l.start(t);l.stop(t+e)}catch(x){}}
+function quakeSnd(d){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,e=d/1000,n=nz(c,e),f=c.createBiquadFilter(),g=c.createGain(),o=c.createOscillator(),og=c.createGain(),tr=c.createOscillator(),tg=c.createGain();
+  f.type="lowpass";f.frequency.value=110;g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(3,t+.4);g.gain.setValueAtTime(3,t+e-.6);g.gain.linearRampToValueAtTime(.0001,t+e);
+  o.type="sine";o.frequency.value=42;tr.frequency.value=9;tg.gain.value=.25;og.gain.value=.3;tr.connect(tg);tg.connect(og.gain);o.connect(og);og.connect(g);
+  n.connect(f);f.connect(g);g.connect(sfxOut(c));n.start(t);o.start(t);tr.start(t);o.stop(t+e);tr.stop(t+e)}catch(x){}}
+function thunderSnd(len=2.8,vol=3.5){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,n=nz(c,len+.3),f=c.createBiquadFilter(),g=c.createGain(),k=nz(c,.3),h=c.createBiquadFilter(),kg=c.createGain(),o=sfxOut(c);
+  f.type="lowpass";f.frequency.setValueAtTime(900,t);f.frequency.exponentialRampToValueAtTime(70,t+len*.93);g.gain.setValueAtTime(vol,t+.05);g.gain.exponentialRampToValueAtTime(.001,t+len);
+  h.type="highpass";h.frequency.value=1500;kg.gain.setValueAtTime(.8,t);kg.gain.exponentialRampToValueAtTime(.001,t+.25);
+  n.connect(f);f.connect(g);g.connect(o);k.connect(h);h.connect(kg);kg.connect(o);n.start(t);k.start(t);n.stop(t+len+.3);k.stop(t+.3)}catch(x){}}
+// 빗소리: 고음 쪽 잡음을 부드럽게 깔아 줌
+function rainSnd(d){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,e=d/1000,n=nz(c,e),h=c.createBiquadFilter(),l=c.createBiquadFilter(),g=c.createGain();
+  h.type="highpass";h.frequency.value=900;l.type="lowpass";l.frequency.value=7500;
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(.6,t+.5);g.gain.setValueAtTime(.6,t+e-.6);g.gain.linearRampToValueAtTime(.0001,t+e);
+  n.connect(h);h.connect(l);l.connect(g);g.connect(sfxOut(c));n.start(t)}catch(x){}}
+s.on("start",({seed,n,mode:m,ms,events})=>{mode=m||1;miss=0;perfect=false;cbm={};evs=events||[];$("combo").classList.toggle("hidden",room.gmode!=="combo");
+  board=Game.makeBoard(seed,n);endAt=Date.now()+ms;sc={};render();renderScores();go("game");sched();
   clearInterval(tick);tick=setInterval(()=>{{const l=Math.max(0,Math.ceil((endAt-Date.now())/1000));$("time").textContent="Time: "+l+(l===0?" · 다른 플레이어 대기 중":"")}},250);
 });
-s.on("board",({seed,ms})=>{miss=0;perfect=false;board=Game.makeBoard(seed,room.n);if(ms)endAt=Date.now()+ms;render()});
-s.on("scores",a=>{a.forEach(x=>{sc[x.id]=x.score;if(x.id===s.id&&x.score>=200&&!perfect){perfect=true;cheer()}});if(view==="game")renderScores()});
+s.on("board",({seed,ms,events})=>{miss=0;perfect=false;cbm={};if(events)evs=events;board=Game.makeBoard(seed,room.n);if(ms)endAt=Date.now()+ms;render();stopFx();sched()});
+s.on("scores",a=>{a.forEach(x=>{sc[x.id]=x.score;cbm[x.id]={c:x.combo||0,m:x.max||0};if(x.id===s.id&&x.score>=200&&!perfect){perfect=true;cheer()}});if(view==="game")renderScores()});
 s.on("end",rank=>{
-  clearInterval(tick);endAt=0;
-  $("rank").innerHTML=rank.map((p,i)=>`<div class="pl${p.id===s.id?" me":""}"><span>${i+1}위 ${esc(p.nick)}</span><span>${p.score}점</span></div>`).join("");
+  clearInterval(tick);endAt=0;stopFx();
+  $("rank").innerHTML=rank.map((p,i)=>`<div class="pl${p.id===s.id?" me":""}"><span>${i+1}위 ${esc(p.nick)}</span><span>${room.gmode==="combo"?`🔥 ${p.combo}콤보 · `:""}${p.score}점</span></div>`).join("");
   go("result");
 });
 </script>
