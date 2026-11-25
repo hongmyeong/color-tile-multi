@@ -10,7 +10,7 @@ app.use(express.static(__dirname + "/public"));
 
 const rooms = new Map();
 const DUR = 120, MAX = 8, CD = 3; // 게임 시간, 최대 인원, 카운트다운(초)
-const SURV = ["snow", "quake", "fog", "night", "thunder", "rain"]; // 서바이벌 방해 이벤트 종류
+const SURV = ["snow", "quake", "fog", "night", "thunder", "rain", "runner", "shoot"]; // 서바이벌 방해 이벤트 종류
 const EVENT_MS = 6000; // 방해 이벤트 지속 시간(ms)
 const TEST = process.env.TEST_MODE === "1"; // 테스트 모드: 켜져 있을 때만 치트(F9)를 허용 (평소엔 꺼 둘 것)
 const rnd = () => Math.floor(Math.random() * 2 ** 31);
@@ -160,20 +160,6 @@ io.on("connection", (s) => {
     if (rem === null) return;
     if (rem.length) { p.combo = (p.combo || 0) + 1; p.max = Math.max(p.max || 0, p.combo); } else p.combo = 0;
     p.score = rem.length ? p.score + rem.length : Math.max(0, p.score - 1);
-    scores(r);
-  });
-  s.on("reshuffle", () => {
-    const r = me(s), p = r && r.players.get(s.id);
-    if (!p || r.state !== "playing" || p.st !== "playing") return;
-    if (Date.now() > p.endAt) return; // 내 시간이 끝났으면 판갈기 불가
-    const seed = rnd();
-    p.board = G.makeBoard(seed, r.n);
-    p.score = 0;
-    p.combo = 0;
-    p.max = 0;
-    p.endAt = Date.now() + DUR * 1000; // 시간도 초기화
-    resched(r);
-    s.emit("board", { seed, ms: DUR * 1000, events: r.events });
     scores(r);
   });
   s.on("cheat", () => {
