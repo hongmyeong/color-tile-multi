@@ -15,12 +15,13 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-
 .cdov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:30;font-weight:800;color:#fff;font-size:min(40vw,220px)}
 #cdn{animation:cdpop .4s ease-out}@keyframes cdpop{from{transform:scale(1.5);opacity:0}to{transform:scale(1);opacity:1}}
 #fog{position:fixed;inset:0;z-index:24;pointer-events:none;overflow:hidden}
-.fogb{position:absolute;left:0;top:0;border-radius:50%;background:radial-gradient(circle,rgba(228,234,246,.85) 0%,rgba(228,234,246,.5) 40%,rgba(228,234,246,0) 72%);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);-webkit-mask-image:radial-gradient(circle,#000 30%,transparent 72%);mask-image:radial-gradient(circle,#000 30%,transparent 72%);will-change:transform,opacity}
+.fogb{position:absolute;left:0;top:0;border-radius:50%;background:radial-gradient(circle,rgba(228,234,246,.8) 0%,rgba(228,234,246,.45) 40%,rgba(228,234,246,0) 70%);will-change:transform,opacity}
+.fogblur{position:absolute;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
 #nite{position:fixed;inset:0;z-index:26;pointer-events:none;background:radial-gradient(circle 120px at var(--mx,50%) var(--my,50%),rgba(0,0,0,0) 0,rgba(0,0,0,.94) 100%);animation:fin .4s}
 #flash{position:fixed;inset:0;z-index:27;pointer-events:none;background:#fff;animation:fl .5s ease-out forwards}
 @keyframes fin{from{opacity:0}to{opacity:1}}@keyframes fl{0%{opacity:var(--a,.7)}100%{opacity:0}}
 .quake{animation:qk .09s linear infinite}@keyframes qk{0%{transform:translateX(-5px)}50%{transform:translateX(5px)}100%{transform:translateX(-5px)}}
-#fx,#fog,#fog *,.fogb,#nite,#flash{pointer-events:none!important} /* 방해 효과가 클릭을 가로채지 않도록 */
+#fx,#fog,#fog *,.fogb,#nite,#flash,#glass,#runners,#runners *{pointer-events:none!important} /* 방해 효과가 클릭을 가로채지 않도록 */
 .ver{font-size:12px;font-weight:400;color:var(--mu);margin-left:2px;vertical-align:middle}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:12px}
 h1{text-align:center;margin:8px 0 12px}
@@ -48,7 +49,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 <div id="testbadge" class="hidden" style="text-align:center;margin-bottom:8px"><span style="background:#7a1f1f;color:#fff;border-radius:999px;padding:3px 12px;font-size:12px">🧪 테스트 모드 · 게임 중 F9 = 200점</span></div>
 
 <div id="v-lobby">
-  <h1>컬러 타일 멀티 <small class="ver">v27</small></h1>
+  <h1>컬러 타일 멀티 <small class="ver">v30</small></h1>
   <div class="card">
       <div class="row"><button class="p" id="create">방 생성</button><button id="quick">빠른 입장 (랜덤 매칭)</button></div>
     <div class="row"><input type="text" id="code" maxlength="4" placeholder="방 코드" style="width:110px;text-transform:uppercase"><button class="p" id="join">방 접속</button></div>
@@ -84,8 +85,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 
 <div id="v-game" class="hidden">
   <div class="top"><span id="time">Time: 120</span><span id="combo" class="hidden"></span><span id="score">Score: 0</span></div>
-  <div class="row"><button id="reshuffle">🔄 판갈기</button></div>
-  <div class="game"><div id="boardBox"><div id="board"></div></div>
+    <div class="game"><div id="boardBox"><div id="board"></div></div>
   <div id="side" class="card"><b>점수판</b><div id="scores"></div></div></div>
 </div>
 
@@ -97,6 +97,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 </div>
 
 <canvas id="fx" class="hidden" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:25"></canvas><div id="fog" class="hidden"></div><div id="nite" class="hidden"></div><div id="flash" class="hidden"></div>
+<canvas id="glass" class="hidden" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:25;transition:opacity .5s"></canvas><div id="runners" class="hidden" style="position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:24"></div>
 <div id="cd" class="cdov hidden"><span id="cdn">3</span></div>
 <script src="/socket.io/socket.io.js"></script>
 <script src="/game.js"></script>
@@ -164,7 +165,6 @@ $("leave").onclick=$("leave2").onclick=out;
 $("ready").onclick=()=>{const p=room.players.find(p=>p.id===s.id);s.emit("ready",!p.ready)};
 $("go").onclick=()=>{$("rmsg").textContent="";s.emit("start")};
 $("back").onclick=()=>{s.emit("back");go("room")};
-$("reshuffle").onclick=()=>{if(confirm("시간, 점수, 판을 모두 초기화합니다."))s.emit("reshuffle")};
 
 s.on("room",r=>{room=r;if(r.state==="lobby")$("cd").classList.add("hidden");if(view==="lobby")go("room");renderRoom();if(view==="game")renderScores()});
 s.on("kicked",()=>{room=null;cleanUrl();go("lobby");$("err").textContent="방에서 추방되었습니다."});
@@ -211,34 +211,70 @@ function renderScores(){
 s.on("countdown",({n})=>{
   $("cd").classList.remove("hidden");const e=$("cdn");e.textContent=n;e.style.animation="none";void e.offsetWidth;e.style.animation="";tone(660,.12,"sine",.28);
 });
-const GDESC={normal:"점수가 높은 순으로 순위를 매겨요.",survival:"게임 중 90·60·30초가 남았을 때 방해 이벤트가 한 번씩 발생해요. (폭설·지진·안개·밤·천둥번개·폭우)",combo:"한 판에서 연속으로 깬 콤보가 가장 높은 순으로 순위를 매겨요. 틀리면 콤보가 초기화돼요."};
+const GDESC={normal:"점수가 높은 순으로 순위를 매겨요.",survival:"게임 중 90·60·30초가 남았을 때 방해 이벤트가 한 번씩 발생해요.",combo:"한 판에서 연속으로 깬 콤보가 가장 높은 순으로 순위를 매겨요. 틀리면 콤보가 초기화돼요."};
 // ---------- 서바이벌 방해 이벤트 ----------
 const fxc=$("fx"),fctx=fxc.getContext("2d");let fxRaf=0,evT=[],mx=innerWidth/2,my=innerHeight/2;
 const moveNite=(x,y)=>{mx=x;my=y;const n=$("nite");n.style.setProperty("--mx",x+"px");n.style.setProperty("--my",y+"px")};
 addEventListener("mousemove",e=>moveNite(e.clientX,e.clientY));
 addEventListener("touchstart",e=>moveNite(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
 addEventListener("touchmove",e=>moveNite(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
-function stopFx(){evT.forEach(clearTimeout);evT=[];cancelAnimationFrame(fxRaf);fctx.clearRect(0,0,fxc.width,fxc.height);$("fog").innerHTML="";["fx","fog","nite","flash"].forEach(i=>$(i).classList.add("hidden"));$("fog").innerHTML="";$("board").classList.remove("quake")}
+function stopFx(){evT.forEach(clearTimeout);evT=[];cancelAnimationFrame(fxRaf);fctx.clearRect(0,0,fxc.width,fxc.height);$("fog").innerHTML="";$("runners").innerHTML="";cancelAnimationFrame(runRaf);["fx","fog","nite","flash","glass","runners"].forEach(i=>$(i).classList.add("hidden"));$("fog").innerHTML="";$("board").classList.remove("quake")}
 function sched(){evT.forEach(clearTimeout);evT=evs.map(e=>setTimeout(()=>runEvent(e.t,e.d),e.at))}
 function precip(kind,d){fxc.width=innerWidth;fxc.height=innerHeight;fxc.classList.remove("hidden");
-  const snow=kind==="snow",P=[];for(let i=0;i<(snow?260:320);i++)P.push({x:Math.random()*fxc.width,y:Math.random()*fxc.height,r:1+Math.random()*3,v:snow?4+Math.random()*5:20+Math.random()*10,w:snow?3+Math.random()*4:4});
+  const snow=kind==="snow",P=[];for(let i=0;i<(snow?650:320);i++)P.push({x:Math.random()*fxc.width,y:Math.random()*fxc.height,r:snow?1.2+Math.random()*3.3:1+Math.random()*3,v:snow?10+Math.random()*13:20+Math.random()*10,w:snow?7+Math.random()*10:4});
   const t0=performance.now(),end=t0+d;cancelAnimationFrame(fxRaf);
   const step=t=>{fctx.clearRect(0,0,fxc.width,fxc.height);fctx.globalAlpha=Math.max(0,Math.min(1,(t-t0)/300,(end-t)/400));
     P.forEach(p=>{p.x+=p.w;p.y+=p.v;if(p.y>fxc.height){p.y=-10;p.x=Math.random()*fxc.width}if(p.x>fxc.width)p.x=0;
-      if(snow){fctx.fillStyle="rgba(255,255,255,.8)";fctx.beginPath();fctx.arc(p.x,p.y,p.r,0,7);fctx.fill()}
+      if(snow){fctx.fillStyle="rgba(255,255,255,.92)";fctx.beginPath();fctx.arc(p.x,p.y,p.r,0,7);fctx.fill()}
       else{fctx.strokeStyle="rgba(170,200,255,.6)";fctx.lineWidth=1.3;fctx.beginPath();fctx.moveTo(p.x,p.y);fctx.lineTo(p.x-p.w*1.2,p.y-p.v*1.2);fctx.stroke()}});
     if(t<end)fxRaf=requestAnimationFrame(step);else{fctx.clearRect(0,0,fxc.width,fxc.height);fxc.classList.add("hidden")}};
   fxRaf=requestAnimationFrame(step)}
 const flash=()=>{const f=$("flash");f.style.setProperty("--a",.45+Math.random()*.3);f.classList.remove("hidden");f.style.animation="none";void f.offsetWidth;f.style.animation="";setTimeout(()=>f.classList.add("hidden"),520)};
+// ---------- 추가 이벤트: 캐릭터 소동 / 난사 ----------
+const RUNNER_FALLBACK="data:image/svg+xml;utf8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><circle cx="32" cy="32" r="28" fill="#ffd54f" stroke="#333" stroke-width="3"/><circle cx="23" cy="27" r="4" fill="#333"/><circle cx="41" cy="27" r="4" fill="#333"/><path d="M20 40q12 12 24 0" fill="none" stroke="#333" stroke-width="3"/></svg>');
+let runRaf=0;
+// 이미지는 public/runner.png 를 불러옴 (없으면 기본 얼굴 그림 사용). 5~10개가 랜덤 크기·속도로 화면을 돌아다님
+function runners(d){const box=$("runners"),W=innerWidth,H=innerHeight,n=5+Math.floor(Math.random()*6),R=[];box.innerHTML="";box.classList.remove("hidden");
+  for(let i=0;i<n;i++){const im=new Image(),z=50+Math.random()*100,sp=80+Math.random()*320,a=Math.random()*6.283;
+    im.onerror=()=>{im.onerror=null;im.src=RUNNER_FALLBACK};im.src="/runner.png";
+    im.style.cssText=`position:absolute;left:0;top:0;width:${z}px;image-rendering:pixelated;will-change:transform`;box.appendChild(im);
+    R.push({im,z,x:Math.random()*(W-z),y:Math.random()*(H-z*1.4),vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,rot:Math.random()*360,spin:(Math.random()<.5?-1:1)*(60+Math.random()*240)})}
+  const t0=performance.now();let last=t0;cancelAnimationFrame(runRaf);
+  const step=t=>{const dt=Math.min(.05,(t-last)/1e3);last=t;
+    R.forEach(r=>{r.x+=r.vx*dt;r.y+=r.vy*dt;if(r.x<0||r.x>W-r.z){r.vx*=-1;r.x=Math.max(0,Math.min(W-r.z,r.x))}if(r.y<0||r.y>H-r.z*1.4){r.vy*=-1;r.y=Math.max(0,Math.min(H-r.z*1.4,r.y))}
+      r.rot+=r.spin*dt;r.im.style.transform=`translate(${r.x}px,${r.y}px) rotate(${r.rot}deg)`});
+    box.style.opacity=Math.max(0,Math.min(1,(t-t0)/300,(t0+d-t)/400));
+    if(t<t0+d)runRaf=requestAnimationFrame(step);else{box.classList.add("hidden");box.innerHTML=""}};
+  runRaf=requestAnimationFrame(step)}
+// 깨진 유리 무늬: 중심에서 퍼지는 금 + 둘레 균열
+function crack(c,cx,cy,R){const rays=9+Math.floor(Math.random()*5),pts=[];c.lineCap="round";
+  for(let i=0;i<rays;i++){let a=i/rays*Math.PI*2+(Math.random()-.5)*.35,x=cx,y=cy;const len=R*(.55+Math.random()*.5),n=5+Math.floor(Math.random()*3),seg=[[cx,cy]];
+    for(let k=1;k<=n;k++){a+=(Math.random()-.5)*.35;x+=Math.cos(a)*len/n;y+=Math.sin(a)*len/n;seg.push([x,y])}pts.push(seg)}
+  const ln=(p,q,w,s)=>{c.beginPath();c.moveTo(p[0],p[1]);c.lineTo(q[0],q[1]);c.lineWidth=w;c.strokeStyle=s;c.stroke()};
+  pts.forEach(seg=>{for(let k=1;k<seg.length;k++){ln(seg[k-1],seg[k],Math.max(1,2.6-k*.3)+1.5,"rgba(0,0,0,.35)");ln(seg[k-1],seg[k],Math.max(.7,2.4-k*.3),"rgba(255,255,255,.92)")}});
+  for(let ring=2;ring<=4;ring++){c.beginPath();pts.forEach((seg,i)=>{const p=seg[Math.min(ring,seg.length-1)];i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])});c.closePath();c.lineWidth=1;c.strokeStyle="rgba(255,255,255,.6)";c.stroke()}
+  const g=c.createRadialGradient(cx,cy,0,cx,cy,R*.18);g.addColorStop(0,"rgba(0,0,0,.85)");g.addColorStop(1,"rgba(255,255,255,0)");c.fillStyle=g;c.beginPath();c.arc(cx,cy,R*.18,0,7);c.fill()}
+// 총소리 "탕!": 짧은 고음 잡음 + 낮은 울림
+function shotSnd(){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,n=nz(c,.25),h=c.createBiquadFilter(),g=c.createGain(),o=c.createOscillator(),og=c.createGain(),out=sfxOut(c);
+  h.type="highpass";h.frequency.value=900;g.gain.setValueAtTime(1.2,t);g.gain.exponentialRampToValueAtTime(.001,t+.2);n.connect(h);h.connect(g);g.connect(out);
+  o.type="sine";o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(40,t+.18);og.gain.setValueAtTime(.9,t);og.gain.exponentialRampToValueAtTime(.001,t+.2);o.connect(og);og.connect(out);
+  n.start(t);o.start(t);o.stop(t+.25);n.stop(t+.25)}catch(x){}}
 function runEvent(t,d){
   if(t==="snow"){precip("snow",d);wind(d)}
   else if(t==="rain"){precip("rain",d);rainSnd(d)}
   else if(t==="quake"){const b=$("board");b.classList.add("quake");quakeSnd(d);setTimeout(()=>b.classList.remove("quake"),d)}
   else if(t==="fog"){const f=$("fog"),b=$("board").getBoundingClientRect(),W=innerWidth;f.innerHTML="";f.classList.remove("hidden");
+    const bl=document.createElement("div");bl.className="fogblur";bl.style.cssText=`left:${b.left}px;top:${b.top}px;width:${b.width}px;height:${b.height}px`;f.appendChild(bl);
+    bl.animate([{opacity:0},{opacity:1,offset:.2},{opacity:1,offset:.8},{opacity:0}],{duration:d+1200,fill:"forwards"});
     for(let i=0;i<7;i++){const z=320+Math.random()*280,e=document.createElement("div"),dir=Math.random()<.5?-1:1,x0=dir>0?-z*.6+Math.random()*W*.35:W*.65+Math.random()*W*.35-z*.4,y=b.top+Math.random()*b.height-z*.35;
       e.className="fogb";e.style.cssText=`width:${z}px;height:${z*.75}px`;f.appendChild(e);
       e.animate([{transform:`translate(${x0}px,${y}px)`,opacity:0},{opacity:1,offset:.25},{opacity:1,offset:.75},{transform:`translate(${x0+dir*(W*.4+Math.random()*W*.25)}px,${y+(Math.random()-.5)*80}px)`,opacity:0}],{duration:d+1200,easing:"linear",fill:"forwards"})}
     setTimeout(()=>{f.classList.add("hidden");f.innerHTML=""},d+1300)}
+  else if(t==="runner")runners(d);
+  else if(t==="shoot"){const g=$("glass"),c=g.getContext("2d");g.width=innerWidth;g.height=innerHeight;c.clearRect(0,0,g.width,g.height);g.style.opacity=1;g.classList.remove("hidden");
+    [200,600,1000].forEach(a=>setTimeout(shotSnd,a));
+    for(let i=0;i<3;i++)setTimeout(()=>crack(c,80+Math.random()*(g.width-160),80+Math.random()*(g.height-160),140+Math.random()*130),1400+i*250);
+    setTimeout(()=>{g.style.opacity=0},d-500);setTimeout(()=>g.classList.add("hidden"),d)}
   else if(t==="night"){moveNite(mx,my);$("nite").classList.remove("hidden");setTimeout(()=>$("nite").classList.add("hidden"),d)}
   else if(t==="thunder"){const n=Math.min(3+Math.floor(Math.random()*3),Math.floor((d-600)/800)+1);
     for(let i=0;i<n;i++){const a=300+(n>1?i*(d-900)/(n-1):0)+(i&&i<n-1?(Math.random()-.5)*200:0);
@@ -247,7 +283,7 @@ const nz=(c,sec)=>{const b=c.createBuffer(1,Math.ceil(c.sampleRate*sec),c.sample
 const sfxOut=c=>{const k=c.createDynamicsCompressor();k.connect(c.destination);return k};
 function wind(d){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,e=d/1000,n=nz(c,e),f=c.createBiquadFilter(),g=c.createGain(),l=c.createOscillator(),lg=c.createGain();
   f.type="bandpass";f.Q.value=1.2;f.frequency.value=550;l.frequency.value=.8;lg.gain.value=280;l.connect(lg);lg.connect(f.frequency);
-  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(1.4,t+.7);g.gain.setValueAtTime(1.4,t+e-.7);g.gain.linearRampToValueAtTime(.0001,t+e);
+  g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(2,t+.7);g.gain.setValueAtTime(2,t+e-.7);g.gain.linearRampToValueAtTime(.0001,t+e);
   n.connect(f);f.connect(g);g.connect(sfxOut(c));n.start(t);l.start(t);l.stop(t+e)}catch(x){}}
 function quakeSnd(d){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,e=d/1000,n=nz(c,e),f=c.createBiquadFilter(),g=c.createGain(),o=c.createOscillator(),og=c.createGain(),tr=c.createOscillator(),tg=c.createGain();
   f.type="lowpass";f.frequency.value=110;g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(3,t+.4);g.gain.setValueAtTime(3,t+e-.6);g.gain.linearRampToValueAtTime(.0001,t+e);
@@ -266,7 +302,6 @@ s.on("start",({seed,n,mode:m,ms,events})=>{mode=m||1;miss=0;perfect=false;cbm={}
   board=Game.makeBoard(seed,n);endAt=Date.now()+ms;sc={};render();renderScores();go("game");sched();
   clearInterval(tick);tick=setInterval(()=>{{const l=Math.max(0,Math.ceil((endAt-Date.now())/1000));$("time").textContent="Time: "+l+(l===0?" · 다른 플레이어 대기 중":"")}},250);
 });
-s.on("board",({seed,ms,events})=>{miss=0;perfect=false;cbm={};if(events)evs=events;board=Game.makeBoard(seed,room.n);if(ms)endAt=Date.now()+ms;render();stopFx();sched()});
 s.on("scores",a=>{a.forEach(x=>{sc[x.id]=x.score;cbm[x.id]={c:x.combo||0,m:x.max||0};if(x.id===s.id&&x.score>=200&&!perfect){perfect=true;cheer()}});if(view==="game")renderScores()});
 s.on("end",rank=>{
   clearInterval(tick);endAt=0;stopFx();
