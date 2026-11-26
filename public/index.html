@@ -49,7 +49,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 <div id="testbadge" class="hidden" style="text-align:center;margin-bottom:8px"><span style="background:#7a1f1f;color:#fff;border-radius:999px;padding:3px 12px;font-size:12px">🧪 테스트 모드 · 게임 중 F9 = 200점</span></div>
 
 <div id="v-lobby">
-  <h1>컬러 타일 멀티 <small class="ver">v30</small></h1>
+  <h1>컬러 타일 멀티 <small class="ver">v32</small></h1>
   <div class="card">
       <div class="row"><button class="p" id="create">방 생성</button><button id="quick">빠른 입장 (랜덤 매칭)</button></div>
     <div class="row"><input type="text" id="code" maxlength="4" placeholder="방 코드" style="width:110px;text-transform:uppercase"><button class="p" id="join">방 접속</button></div>
@@ -130,10 +130,10 @@ function voice(t,f0,f1,dur,fm,vol){const c=AC(),o=c.createOscillator(),g=c.creat
   fm.forEach(([f,q,k])=>{const b=c.createBiquadFilter(),m=c.createGain();b.type="bandpass";b.frequency.value=f;b.Q.value=q;m.gain.value=k;o.connect(b);b.connect(m);m.connect(g)});
   g.connect(c.destination);o.start(t);l.start(t);o.stop(t+dur+.05);l.stop(t+dur+.05)}
 // 야유(부우~): 낮은 "우" 소리를 여러 명이 내며 음이 아래로 처짐
-function boo(){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime;
+function boo(){if(!opt.sfx||playC("boo"))return;try{const c=AC(),t=c.currentTime;
   for(let i=0;i<7;i++){const f=100+Math.random()*60,d=1.3+Math.random()*.5;voice(t+Math.random()*.3,f,f*.78,d,[[300,6,1.3],[850,8,.7]],.28)}}catch(e){}}
 // 만점 축하: 박수 소리 + 환호성
-function cheer(){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,len=3.4;
+function cheer(){if(!opt.sfx||playC("cheer"))return;try{const c=AC(),t=c.currentTime,len=3.4;
   const nb=c.createBuffer(1,c.sampleRate,c.sampleRate),d=nb.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
   const src=c.createBufferSource();src.buffer=nb;src.loop=true;
   const hp=c.createBiquadFilter();hp.type="highpass";hp.frequency.value=1200;
@@ -209,7 +209,7 @@ function renderScores(){
   if(gm==="combo"){const c=cm({id:s.id});$("combo").textContent=`🔥 콤보 ${c.c} (최고 ${c.m})`}
 }
 s.on("countdown",({n})=>{
-  $("cd").classList.remove("hidden");const e=$("cdn");e.textContent=n;e.style.animation="none";void e.offsetWidth;e.style.animation="";tone(660,.12,"sine",.28);
+  $("cd").classList.remove("hidden");const e=$("cdn");e.textContent=n;e.style.animation="none";void e.offsetWidth;e.style.animation="";if(!playC("countdown"))tone(660,.12,"sine",.28);
 });
 const GDESC={normal:"점수가 높은 순으로 순위를 매겨요.",survival:"게임 중 90·60·30초가 남았을 때 방해 이벤트가 한 번씩 발생해요.",combo:"한 판에서 연속으로 깬 콤보가 가장 높은 순으로 순위를 매겨요. 틀리면 콤보가 초기화돼요."};
 // ---------- 서바이벌 방해 이벤트 ----------
@@ -246,19 +246,32 @@ function runners(d){const box=$("runners"),W=innerWidth,H=innerHeight,n=5+Math.f
     box.style.opacity=Math.max(0,Math.min(1,(t-t0)/300,(t0+d-t)/400));
     if(t<t0+d)runRaf=requestAnimationFrame(step);else{box.classList.add("hidden");box.innerHTML=""}};
   runRaf=requestAnimationFrame(step)}
-// 깨진 유리 무늬: 중심에서 퍼지는 금 + 둘레 균열
-function crack(c,cx,cy,R){const rays=9+Math.floor(Math.random()*5),pts=[];c.lineCap="round";
-  for(let i=0;i<rays;i++){let a=i/rays*Math.PI*2+(Math.random()-.5)*.35,x=cx,y=cy;const len=R*(.55+Math.random()*.5),n=5+Math.floor(Math.random()*3),seg=[[cx,cy]];
-    for(let k=1;k<=n;k++){a+=(Math.random()-.5)*.35;x+=Math.cos(a)*len/n;y+=Math.sin(a)*len/n;seg.push([x,y])}pts.push(seg)}
-  const ln=(p,q,w,s)=>{c.beginPath();c.moveTo(p[0],p[1]);c.lineTo(q[0],q[1]);c.lineWidth=w;c.strokeStyle=s;c.stroke()};
-  pts.forEach(seg=>{for(let k=1;k<seg.length;k++){ln(seg[k-1],seg[k],Math.max(1,2.6-k*.3)+1.5,"rgba(0,0,0,.35)");ln(seg[k-1],seg[k],Math.max(.7,2.4-k*.3),"rgba(255,255,255,.92)")}});
-  for(let ring=2;ring<=4;ring++){c.beginPath();pts.forEach((seg,i)=>{const p=seg[Math.min(ring,seg.length-1)];i?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])});c.closePath();c.lineWidth=1;c.strokeStyle="rgba(255,255,255,.6)";c.stroke()}
-  const g=c.createRadialGradient(cx,cy,0,cx,cy,R*.18);g.addColorStop(0,"rgba(0,0,0,.85)");g.addColorStop(1,"rgba(255,255,255,0)");c.fillStyle=g;c.beginPath();c.arc(cx,cy,R*.18,0,7);c.fill()}
+// 총알 구멍 + 금 간 유리: 울퉁불퉁한 검은 구멍(가운데는 하얗게 뚫림) + 가는 균열. 어두운 배경에서도 보이게 흰 테두리를 깔아 줌
+function ragged(c,cx,cy,r,spk){const n=14+Math.floor(Math.random()*8);c.beginPath();for(let i=0;i<n*2;i++){const a=i/(n*2)*Math.PI*2,rr=r*(i%2?.7+Math.random()*.2:1+Math.random()*spk),x=cx+Math.cos(a)*rr,y=cy+Math.sin(a)*rr;i?c.lineTo(x,y):c.moveTo(x,y)}c.closePath()}
+function bhole(c,cx,cy,r){ragged(c,cx,cy,r,.55);c.lineWidth=3;c.strokeStyle="rgba(255,255,255,.85)";c.stroke();c.fillStyle="#050505";c.fill();c.beginPath();c.arc(cx,cy,r*.5,0,7);c.fillStyle="#fff";c.fill();c.lineWidth=1.2;c.strokeStyle="#000";c.stroke()}
+function crack(c,cx,cy,R){const ty=Math.random(),rays=ty<.4?14+Math.floor(Math.random()*6):ty<.75?7+Math.floor(Math.random()*4):0,pts=[];c.lineCap="round";
+  const ln=(p,q,w)=>{c.beginPath();c.moveTo(p[0],p[1]);c.lineTo(q[0],q[1]);c.lineWidth=w+1.8;c.strokeStyle="rgba(255,255,255,.7)";c.stroke();c.lineWidth=w;c.strokeStyle="rgba(0,0,0,.95)";c.stroke()};
+  for(let i=0;i<rays;i++){let a=i/rays*Math.PI*2+(Math.random()-.5)*.5,x=cx,y=cy;const len=R*(.5+Math.random()*.7),n=6+Math.floor(Math.random()*4),seg=[[cx,cy]];
+    for(let k=1;k<=n;k++){a+=(Math.random()-.5)*.3;x+=Math.cos(a)*len/n;y+=Math.sin(a)*len/n;seg.push([x,y]);ln(seg[k-1],seg[k],Math.max(.6,1.5-k*.15));
+      if(Math.random()<.18){const b=a+(Math.random()<.5?-1:1)*(.5+Math.random()*.6),bl=len/n*(1+Math.random()*2);ln([x,y],[x+Math.cos(b)*bl,y+Math.sin(b)*bl],.7)}}
+    pts.push(seg)}
+  if(ty<.4)for(let ring=1;ring<=3;ring++)for(let i=0;i<pts.length;i++){if(Math.random()<.2)continue;const A=pts[i],B=pts[(i+1)%pts.length];ln(A[Math.min(ring,A.length-1)],B[Math.min(ring,B.length-1)],.7)}
+  bhole(c,cx,cy,R*(rays?.11:.16));if(!rays&&Math.random()<.4)bhole(c,cx+R*.22,cy+R*.1,R*.1)}
 // 총소리 "탕!": 짧은 고음 잡음 + 낮은 울림
-function shotSnd(){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,n=nz(c,.25),h=c.createBiquadFilter(),g=c.createGain(),o=c.createOscillator(),og=c.createGain(),out=sfxOut(c);
+function shotSnd(){if(!opt.sfx||playC("shot"))return;try{const c=AC(),t=c.currentTime,n=nz(c,.25),h=c.createBiquadFilter(),g=c.createGain(),o=c.createOscillator(),og=c.createGain(),out=sfxOut(c);
   h.type="highpass";h.frequency.value=900;g.gain.setValueAtTime(1.2,t);g.gain.exponentialRampToValueAtTime(.001,t+.2);n.connect(h);h.connect(g);g.connect(out);
   o.type="sine";o.frequency.setValueAtTime(160,t);o.frequency.exponentialRampToValueAtTime(40,t+.18);og.gain.setValueAtTime(.9,t);og.gain.exponentialRampToValueAtTime(.001,t+.2);o.connect(og);og.connect(out);
   n.start(t);o.start(t);o.stop(t+.25);n.stop(t+.25)}catch(x){}}
+// ---------- 사용자 지정 효과음 (public/sfx_이름.mp3 또는 .wav 가 있으면 합성음 대신 사용) ----------
+const CS={};
+async function loadSounds(){if(loadSounds.done)return;loadSounds.done=true;const c=AC();
+  for(const n of["shot","thunder","quake","wind","rain","boo","cheer","countdown"])for(const ext of["mp3","wav"]){
+    try{const r=await fetch(`/sfx_${n}.${ext}`);if(!r.ok)continue;CS[n]=await c.decodeAudioData(await r.arrayBuffer());break}catch(e){}}}
+addEventListener("pointerdown",loadSounds,{once:true});
+const hasC=n=>!!CS[n];
+function playC(n,maxMs){if(!opt.sfx||!CS[n])return false;try{const c=AC(),t=c.currentTime,src=c.createBufferSource(),g=c.createGain(),full=CS[n].duration,dur=maxMs?Math.min(full,maxMs/1000):full;
+  src.buffer=CS[n];g.gain.setValueAtTime(1,t);if(dur<full){g.gain.setValueAtTime(1,t+Math.max(0,dur-.4));g.gain.linearRampToValueAtTime(.0001,t+dur)}
+  src.connect(g);g.connect(c.destination);src.start(t);src.stop(t+dur);return true}catch(e){return false}}
 function runEvent(t,d){
   if(t==="snow"){precip("snow",d);wind(d)}
   else if(t==="rain"){precip("rain",d);rainSnd(d)}
@@ -272,20 +285,20 @@ function runEvent(t,d){
     setTimeout(()=>{f.classList.add("hidden");f.innerHTML=""},d+1300)}
   else if(t==="runner")runners(d);
   else if(t==="shoot"){const g=$("glass"),c=g.getContext("2d");g.width=innerWidth;g.height=innerHeight;c.clearRect(0,0,g.width,g.height);g.style.opacity=1;g.classList.remove("hidden");
-    [200,600,1000].forEach(a=>setTimeout(shotSnd,a));
-    for(let i=0;i<3;i++)setTimeout(()=>crack(c,80+Math.random()*(g.width-160),80+Math.random()*(g.height-160),140+Math.random()*130),1400+i*250);
+    for(let i=0;i<5;i++)setTimeout(shotSnd,200+i*150);
+    for(let i=0;i<5;i++)setTimeout(()=>crack(c,100+Math.random()*(g.width-200),100+Math.random()*(g.height-200),110+Math.random()*100),1200+i*200);
     setTimeout(()=>{g.style.opacity=0},d-500);setTimeout(()=>g.classList.add("hidden"),d)}
   else if(t==="night"){moveNite(mx,my);$("nite").classList.remove("hidden");setTimeout(()=>$("nite").classList.add("hidden"),d)}
   else if(t==="thunder"){const n=Math.min(3+Math.floor(Math.random()*3),Math.floor((d-600)/800)+1);
     for(let i=0;i<n;i++){const a=300+(n>1?i*(d-900)/(n-1):0)+(i&&i<n-1?(Math.random()-.5)*200:0);
-      setTimeout(()=>{const f=$("flash");f.classList.remove("hidden");f.style.animation="none";void f.offsetWidth;f.style.animation="";setTimeout(()=>f.classList.add("hidden"),520);thunderSnd(i===n-1?2.8:1.2+Math.random()*1.2,i===n-1?3.5:2.2+Math.random()*1.3)},a)}}}
+      setTimeout(()=>{const f=$("flash");f.classList.remove("hidden");f.style.animation="none";void f.offsetWidth;f.style.animation="";setTimeout(()=>f.classList.add("hidden"),520);(hasC("thunder")?(i===0&&playC("thunder",d)):thunderSnd(i===n-1?2.8:1.2+Math.random()*1.2,i===n-1?3.5:2.2+Math.random()*1.3))},a)}}}
 const nz=(c,sec)=>{const b=c.createBuffer(1,Math.ceil(c.sampleRate*sec),c.sampleRate),a=b.getChannelData(0);for(let i=0;i<a.length;i++)a[i]=Math.random()*2-1;const n=c.createBufferSource();n.buffer=b;return n};
 const sfxOut=c=>{const k=c.createDynamicsCompressor();k.connect(c.destination);return k};
-function wind(d){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,e=d/1000,n=nz(c,e),f=c.createBiquadFilter(),g=c.createGain(),l=c.createOscillator(),lg=c.createGain();
+function wind(d){if(!opt.sfx||playC("wind",d))return;try{const c=AC(),t=c.currentTime,e=d/1000,n=nz(c,e),f=c.createBiquadFilter(),g=c.createGain(),l=c.createOscillator(),lg=c.createGain();
   f.type="bandpass";f.Q.value=1.2;f.frequency.value=550;l.frequency.value=.8;lg.gain.value=280;l.connect(lg);lg.connect(f.frequency);
   g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(2,t+.7);g.gain.setValueAtTime(2,t+e-.7);g.gain.linearRampToValueAtTime(.0001,t+e);
   n.connect(f);f.connect(g);g.connect(sfxOut(c));n.start(t);l.start(t);l.stop(t+e)}catch(x){}}
-function quakeSnd(d){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,e=d/1000,n=nz(c,e),f=c.createBiquadFilter(),g=c.createGain(),o=c.createOscillator(),og=c.createGain(),tr=c.createOscillator(),tg=c.createGain();
+function quakeSnd(d){if(!opt.sfx||playC("quake",d))return;try{const c=AC(),t=c.currentTime,e=d/1000,n=nz(c,e),f=c.createBiquadFilter(),g=c.createGain(),o=c.createOscillator(),og=c.createGain(),tr=c.createOscillator(),tg=c.createGain();
   f.type="lowpass";f.frequency.value=110;g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(3,t+.4);g.gain.setValueAtTime(3,t+e-.6);g.gain.linearRampToValueAtTime(.0001,t+e);
   o.type="sine";o.frequency.value=42;tr.frequency.value=9;tg.gain.value=.25;og.gain.value=.3;tr.connect(tg);tg.connect(og.gain);o.connect(og);og.connect(g);
   n.connect(f);f.connect(g);g.connect(sfxOut(c));n.start(t);o.start(t);tr.start(t);o.stop(t+e);tr.stop(t+e)}catch(x){}}
@@ -294,7 +307,7 @@ function thunderSnd(len=2.8,vol=3.5){if(!opt.sfx)return;try{const c=AC(),t=c.cur
   h.type="highpass";h.frequency.value=1500;kg.gain.setValueAtTime(.8,t);kg.gain.exponentialRampToValueAtTime(.001,t+.25);
   n.connect(f);f.connect(g);g.connect(o);k.connect(h);h.connect(kg);kg.connect(o);n.start(t);k.start(t);n.stop(t+len+.3);k.stop(t+.3)}catch(x){}}
 // 빗소리: 고음 쪽 잡음을 부드럽게 깔아 줌
-function rainSnd(d){if(!opt.sfx)return;try{const c=AC(),t=c.currentTime,e=d/1000,n=nz(c,e),h=c.createBiquadFilter(),l=c.createBiquadFilter(),g=c.createGain();
+function rainSnd(d){if(!opt.sfx||playC("rain",d))return;try{const c=AC(),t=c.currentTime,e=d/1000,n=nz(c,e),h=c.createBiquadFilter(),l=c.createBiquadFilter(),g=c.createGain();
   h.type="highpass";h.frequency.value=900;l.type="lowpass";l.frequency.value=7500;
   g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(.6,t+.5);g.gain.setValueAtTime(.6,t+e-.6);g.gain.linearRampToValueAtTime(.0001,t+e);
   n.connect(h);h.connect(l);l.connect(g);g.connect(sfxOut(c));n.start(t)}catch(x){}}
