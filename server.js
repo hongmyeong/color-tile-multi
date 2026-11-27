@@ -10,7 +10,7 @@ app.use(express.static(__dirname + "/public"));
 
 const rooms = new Map();
 const DUR = 120, MAX = 8, CD = 3; // 게임 시간, 최대 인원, 카운트다운(초)
-const SURV = ["snow", "quake", "fog", "night", "thunder", "rain", "runner", "shoot"]; // 서바이벌 방해 이벤트 종류
+const SURV = ["snow", "quake", "fog", "night", "thunder", "rain", "runner", "shoot", "love"]; // 서바이벌 방해 이벤트 종류
 const EVENT_MS = 6000; // 방해 이벤트 지속 시간(ms)
 const TEST = process.env.TEST_MODE === "1"; // 테스트 모드: 켜져 있을 때만 치트(F9)를 허용 (평소엔 꺼 둘 것)
 const rnd = () => Math.floor(Math.random() * 2 ** 31);
