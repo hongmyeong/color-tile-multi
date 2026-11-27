@@ -21,7 +21,7 @@ body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-
 #flash{position:fixed;inset:0;z-index:27;pointer-events:none;background:#fff;animation:fl .5s ease-out forwards}
 @keyframes fin{from{opacity:0}to{opacity:1}}@keyframes fl{0%{opacity:var(--a,.7)}100%{opacity:0}}
 .quake{animation:qk .09s linear infinite}@keyframes qk{0%{transform:translateX(-5px)}50%{transform:translateX(5px)}100%{transform:translateX(-5px)}}
-#fx,#fog,#fog *,.fogb,#nite,#flash,#glass,#runners,#runners *{pointer-events:none!important} /* 방해 효과가 클릭을 가로채지 않도록 */
+#fx,#fog,#fog *,.fogb,#nite,#flash,#glass,#runners,#runners *,#love,#love *{pointer-events:none!important} /* 방해 효과가 클릭을 가로채지 않도록 */
 .ver{font-size:12px;font-weight:400;color:var(--mu);margin-left:2px;vertical-align:middle}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:12px}
 h1{text-align:center;margin:8px 0 12px}
@@ -49,7 +49,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 <div id="testbadge" class="hidden" style="text-align:center;margin-bottom:8px"><span style="background:#7a1f1f;color:#fff;border-radius:999px;padding:3px 12px;font-size:12px">🧪 테스트 모드 · 게임 중 F9 = 200점</span></div>
 
 <div id="v-lobby">
-  <h1>컬러 타일 멀티 <small class="ver">v32</small></h1>
+  <h1>컬러 타일 멀티 <small class="ver">v34</small></h1>
   <div class="card">
       <div class="row"><button class="p" id="create">방 생성</button><button id="quick">빠른 입장 (랜덤 매칭)</button></div>
     <div class="row"><input type="text" id="code" maxlength="4" placeholder="방 코드" style="width:110px;text-transform:uppercase"><button class="p" id="join">방 접속</button></div>
@@ -98,6 +98,7 @@ button{cursor:pointer}button.p{background:var(--ac);border-color:var(--ac);color
 
 <canvas id="fx" class="hidden" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:25"></canvas><div id="fog" class="hidden"></div><div id="nite" class="hidden"></div><div id="flash" class="hidden"></div>
 <canvas id="glass" class="hidden" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:25;transition:opacity .5s"></canvas><div id="runners" class="hidden" style="position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:24"></div>
+<div id="love" class="hidden" style="position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:24"></div>
 <div id="cd" class="cdov hidden"><span id="cdn">3</span></div>
 <script src="/socket.io/socket.io.js"></script>
 <script src="/game.js"></script>
@@ -218,7 +219,7 @@ const moveNite=(x,y)=>{mx=x;my=y;const n=$("nite");n.style.setProperty("--mx",x+
 addEventListener("mousemove",e=>moveNite(e.clientX,e.clientY));
 addEventListener("touchstart",e=>moveNite(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
 addEventListener("touchmove",e=>moveNite(e.touches[0].clientX,e.touches[0].clientY),{passive:true});
-function stopFx(){evT.forEach(clearTimeout);evT=[];cancelAnimationFrame(fxRaf);fctx.clearRect(0,0,fxc.width,fxc.height);$("fog").innerHTML="";$("runners").innerHTML="";cancelAnimationFrame(runRaf);["fx","fog","nite","flash","glass","runners"].forEach(i=>$(i).classList.add("hidden"));$("fog").innerHTML="";$("board").classList.remove("quake")}
+function stopFx(){evT.forEach(clearTimeout);evT=[];cancelAnimationFrame(fxRaf);fctx.clearRect(0,0,fxc.width,fxc.height);$("fog").innerHTML="";$("runners").innerHTML="";$("love").innerHTML="";cancelAnimationFrame(runRaf);["fx","fog","nite","flash","glass","runners","love"].forEach(i=>$(i).classList.add("hidden"));$("fog").innerHTML="";$("board").classList.remove("quake")}
 function sched(){evT.forEach(clearTimeout);evT=evs.map(e=>setTimeout(()=>runEvent(e.t,e.d),e.at))}
 function precip(kind,d){fxc.width=innerWidth;fxc.height=innerHeight;fxc.classList.remove("hidden");
   const snow=kind==="snow",P=[];for(let i=0;i<(snow?650:320);i++)P.push({x:Math.random()*fxc.width,y:Math.random()*fxc.height,r:snow?1.2+Math.random()*3.3:1+Math.random()*3,v:snow?10+Math.random()*13:20+Math.random()*10,w:snow?7+Math.random()*10:4});
@@ -265,13 +266,34 @@ function shotSnd(){if(!opt.sfx||playC("shot"))return;try{const c=AC(),t=c.curren
 // ---------- 사용자 지정 효과음 (public/sfx_이름.mp3 또는 .wav 가 있으면 합성음 대신 사용) ----------
 const CS={};
 async function loadSounds(){if(loadSounds.done)return;loadSounds.done=true;const c=AC();
-  for(const n of["shot","thunder","quake","wind","rain","boo","cheer","countdown"])for(const ext of["mp3","wav"]){
+  for(const n of["shot","thunder","quake","wind","rain","boo","cheer","countdown","love"])for(const ext of["mp3","wav"]){
     try{const r=await fetch(`/sfx_${n}.${ext}`);if(!r.ok)continue;CS[n]=await c.decodeAudioData(await r.arrayBuffer());break}catch(e){}}}
 addEventListener("pointerdown",loadSounds,{once:true});
 const hasC=n=>!!CS[n];
 function playC(n,maxMs){if(!opt.sfx||!CS[n])return false;try{const c=AC(),t=c.currentTime,src=c.createBufferSource(),g=c.createGain(),full=CS[n].duration,dur=maxMs?Math.min(full,maxMs/1000):full;
   src.buffer=CS[n];g.gain.setValueAtTime(1,t);if(dur<full){g.gain.setValueAtTime(1,t+Math.max(0,dur-.4));g.gain.linearRampToValueAtTime(.0001,t+dur)}
   src.connect(g);g.connect(c.destination);src.start(t);src.stop(t+dur);return true}catch(e){return false}}
+// 고백공격 소리: 두근두근 심장 소리 + 반짝이는 종소리(사랑해가 나타날 때) + 중간중간 반짝임. public/sfx_love.mp3 가 있으면 그 소리를 사용
+function loveSnd(d){if(!opt.sfx||playC("love",d))return;try{const c=AC(),t=c.currentTime,e=d/1000,o=sfxOut(c);
+  const n=(at,f,dur,v,ty)=>{const os=c.createOscillator(),g=c.createGain();os.type=ty||"sine";os.frequency.setValueAtTime(f,t+at);g.gain.setValueAtTime(.0001,t+at);g.gain.linearRampToValueAtTime(v,t+at+.02);g.gain.exponentialRampToValueAtTime(.001,t+at+dur);os.connect(g);g.connect(o);os.start(t+at);os.stop(t+at+dur+.05)};
+  const bt=(at,v)=>{const os=c.createOscillator(),g=c.createGain();os.frequency.setValueAtTime(85,t+at);os.frequency.exponentialRampToValueAtTime(42,t+at+.12);g.gain.setValueAtTime(v,t+at);g.gain.exponentialRampToValueAtTime(.001,t+at+.17);os.connect(g);g.connect(o);os.start(t+at);os.stop(t+at+.2);n(at,150,.09,v*.35,"triangle")};
+  for(let a=.3;a<e-.6;a+=.8){bt(a,.9);bt(a+.2,.65)}
+  [1047,1319,1568,2093].forEach((f,i)=>n(.4+i*.12,f,.8,.22));
+  for(let i=0;i<14;i++)n(.9+Math.random()*(e-2),1200+Math.random()*1800,.3,.07);
+  [1568,1319,1047].forEach((f,i)=>n(e-1+i*.16,f,.7,.14))}catch(x){}}
+// ---------- 고백공격: 하트 150개가 아래에서 위로 올라가고, 가운데에 "사랑해"가 나타남 ----------
+// 이미지는 public/heart.png, public/heartattack.png 를 불러옴 (없으면 기본 그림 사용)
+const HEART_SRC="/heart.png",HA_SRC="/heartattack.png";
+const HEART_FB="data:image/svg+xml;utf8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 29"><path d="M16 28C4 18 1 12 1 8a7 7 0 0 1 15-2 7 7 0 0 1 15 2c0 4-3 10-15 20z" fill="#ff4fd8"/></svg>');
+const HA_FB="data:image/svg+xml;utf8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="480" height="200"><text x="50%" y="62%" font-size="120" font-weight="800" fill="#ff5ccd" text-anchor="middle" font-family="sans-serif">사랑해</text></svg>');
+function love(d){const box=$("love"),W=innerWidth,H=innerHeight;box.innerHTML="";box.classList.remove("hidden");
+  const img=(src,fb)=>{const im=new Image();im.onerror=()=>{im.onerror=null;im.src=fb};im.src=src;return im};
+  for(let i=0;i<150;i++){const z=24+Math.random()*90,T=1.8+Math.random()*2.7,delay=Math.random()*Math.max(0,d-T*1000-150),x=Math.random()*(W-z),dr=(Math.random()-.5)*80,rot=(Math.random()-.5)*40,im=img(HEART_SRC,HEART_FB);
+    im.style.cssText=`position:absolute;left:0;top:0;width:${z}px;opacity:.9;will-change:transform`;box.appendChild(im);
+    im.animate([{transform:`translate(${x}px,${H+10}px) rotate(${-rot}deg)`},{transform:`translate(${x+dr}px,${-z-10}px) rotate(${rot}deg)`}],{duration:T*1000,delay,easing:"linear",fill:"both"})}
+  const t=img(HA_SRC,HA_FB);t.style.cssText="position:absolute;left:50%;top:50%;width:min(70vw,480px);transform:translate(-50%,-50%)";box.appendChild(t);
+  t.animate([{opacity:0,transform:"translate(-50%,-50%) scale(.85)"},{opacity:1,transform:"translate(-50%,-50%) scale(1)",offset:.25},{opacity:1,transform:"translate(-50%,-50%) scale(1)",offset:.9},{opacity:0,transform:"translate(-50%,-50%) scale(1)"}],{duration:d,easing:"ease-in-out",fill:"both"});
+  setTimeout(()=>{box.classList.add("hidden");box.innerHTML=""},d+200)}
 function runEvent(t,d){
   if(t==="snow"){precip("snow",d);wind(d)}
   else if(t==="rain"){precip("rain",d);rainSnd(d)}
@@ -288,6 +310,7 @@ function runEvent(t,d){
     for(let i=0;i<5;i++)setTimeout(shotSnd,200+i*150);
     for(let i=0;i<5;i++)setTimeout(()=>crack(c,100+Math.random()*(g.width-200),100+Math.random()*(g.height-200),110+Math.random()*100),1200+i*200);
     setTimeout(()=>{g.style.opacity=0},d-500);setTimeout(()=>g.classList.add("hidden"),d)}
+  else if(t==="love"){love(d);loveSnd(d)}
   else if(t==="night"){moveNite(mx,my);$("nite").classList.remove("hidden");setTimeout(()=>$("nite").classList.add("hidden"),d)}
   else if(t==="thunder"){const n=Math.min(3+Math.floor(Math.random()*3),Math.floor((d-600)/800)+1);
     for(let i=0;i<n;i++){const a=300+(n>1?i*(d-900)/(n-1):0)+(i&&i<n-1?(Math.random()-.5)*200:0);
